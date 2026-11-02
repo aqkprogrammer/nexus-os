@@ -45,6 +45,13 @@ Then open http://localhost:3000.
 | `npm run build` | Production build |
 | `npm start` | Run the production build |
 | `npm run typecheck` | TypeScript check |
+| `npm test` | Browser tests with Playwright |
+
+## Testing
+
+`npm test` builds the app and drives it in a real browser, covering the main flows on desktop and every page at phone size. Chat runs through the real endpoint against a small mock in `e2e/mock-openai.mjs`, so tests are free and need no key. Local runs use your installed Chrome.
+
+Every push to `main` runs the same tests, and a failure stops the deploy.
 
 ## Real AI chat
 
@@ -68,7 +75,7 @@ Without a key, the chat falls back to demo replies and says so under its name. `
 
 **Real AI:** deploy to a Node host such as Vercel and set `OPENAI_API_KEY` in its environment variables. Never commit the key.
 
-**Demo:** every push to `main` runs `.github/workflows/deploy.yml`, which publishes a static build to GitHub Pages. Setting `PAGES_BASE_PATH` selects that build and leaves out the API.
+**Demo:** every push to `main` runs `.github/workflows/deploy.yml`, which tests the app, then publishes a static build to GitHub Pages. Setting `PAGES_BASE_PATH` selects that build and leaves out the API. Setting `SITE_URL` makes the link preview image use a full URL.
 
 ## Modules
 

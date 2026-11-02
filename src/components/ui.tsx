@@ -193,7 +193,7 @@ export function Modal({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.98 }}
             transition={{ type: "spring", stiffness: 380, damping: 32 }}
-            className={cn("nx-card w-full max-w-lg bg-[#150b30] p-5", className)}
+            className={cn("nx-card nx-solid w-full max-w-lg p-5", className)}
           >
             <button
               type="button"
@@ -216,11 +216,13 @@ export function Modal({
 
 export function CountUp({ to, format }: { to: number; format: (v: number) => string }) {
   const ref = useRef<HTMLSpanElement>(null);
+  const shown = useRef(0);
   useEffect(() => {
-    const controls = animate(0, to, {
+    const controls = animate(shown.current, to, {
       duration: 1.3,
       ease: [0.16, 1, 0.3, 1],
       onUpdate: (v) => {
+        shown.current = v;
         if (ref.current) ref.current.textContent = format(v);
       },
     });
@@ -384,19 +386,32 @@ export function Toaster() {
         {toasts.map((t) => {
           const Icon = icons[t.tone];
           return (
-            <motion.button
+            <motion.div
               layout
-              type="button"
               key={t.id}
-              onClick={() => dismiss(t.id)}
               initial={{ opacity: 0, x: 40 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 40 }}
-              className="nx-card pointer-events-auto flex cursor-pointer items-center gap-2.5 bg-[#1a0e3a] px-3.5 py-2.5 text-left text-sm"
+              className="nx-card nx-solid pointer-events-auto flex items-center gap-2.5 px-3.5 py-2.5 text-sm"
             >
               <Icon className="size-4 shrink-0 text-nx-lilac" />
-              <span className="min-w-0">{t.text}</span>
-            </motion.button>
+              <span className="min-w-0 flex-1">{t.text}</span>
+              {t.action && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    t.action?.run();
+                    dismiss(t.id);
+                  }}
+                  className="shrink-0 cursor-pointer rounded-md px-1.5 py-0.5 text-[0.8125rem] font-semibold text-nx-lilac hover:bg-white/10"
+                >
+                  {t.action.label}
+                </button>
+              )}
+              <button type="button" aria-label="Dismiss" onClick={() => dismiss(t.id)} className="grid size-5 shrink-0 cursor-pointer place-items-center rounded text-fg-3 hover:text-fg">
+                <X className="size-3.5" />
+              </button>
+            </motion.div>
           );
         })}
       </AnimatePresence>

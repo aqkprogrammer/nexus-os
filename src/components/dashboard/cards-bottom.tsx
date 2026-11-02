@@ -48,6 +48,7 @@ export function AgentTeam() {
 
   return (
     <Card
+      id="tour-agents"
       n={6}
       title={
         <span className="flex items-baseline gap-3">

@@ -472,17 +472,28 @@ export interface CalEvent {
 
 export const SEED_EVENTS: CalEvent[] = [
   { id: "e1", title: "Deep work: Agent engine", day: 0, start: 8, duration: 2.5, area: "Work" },
-  { id: "e2", title: "Team stand-up", day: 0, start: 11, duration: 0.75, area: "Work" },
+  { id: "e2", title: "Team stand-up", day: 0, start: 11, duration: 1, area: "Work" },
+  { id: "e15", title: "Deep work: API design", day: 0, start: 13, duration: 3, area: "Work" },
+  { id: "e16", title: "Code review", day: 0, start: 16, duration: 1.5, area: "Work" },
   { id: "e3", title: "Gym", day: 0, start: 18, duration: 1, area: "Health" },
   { id: "e4", title: "Product review", day: 1, start: 10, duration: 1.5, area: "Work" },
+  { id: "e17", title: "Research reading", day: 1, start: 8, duration: 1.5, area: "Learning" },
+  { id: "e18", title: "Deep work: Memory layer", day: 1, start: 13, duration: 3, area: "Work" },
   { id: "e5", title: "Spanish lesson", day: 1, start: 17, duration: 1, area: "Learning" },
   { id: "e6", title: "Deep work: Q2 deck", day: 2, start: 8, duration: 2, area: "Work" },
   { id: "e7", title: "Lunch with Sarah", day: 2, start: 12.5, duration: 1, area: "Family" },
+  { id: "e19", title: "Deep work: Integrations", day: 2, start: 14, duration: 3, area: "Work" },
   { id: "e8", title: "Investor call", day: 3, start: 9, duration: 1, area: "Work" },
+  { id: "e20", title: "Deep work: Roadmap", day: 3, start: 10.5, duration: 2.5, area: "Work" },
+  { id: "e21", title: "Customer interviews", day: 3, start: 14, duration: 2, area: "Work" },
   { id: "e9", title: "Interval run", day: 3, start: 18, duration: 1, area: "Health" },
   { id: "e10", title: "Weekly planning", day: 4, start: 9, duration: 1, area: "Admin" },
+  { id: "e22", title: "Deep work: Review queue", day: 4, start: 10.5, duration: 2.5, area: "Work" },
+  { id: "e23", title: "Deep work: Analytics", day: 4, start: 14, duration: 2, area: "Work" },
   { id: "e11", title: "Family dinner", day: 4, start: 19, duration: 1.5, area: "Family" },
   { id: "e12", title: "Long trail run", day: 5, start: 8, duration: 2, area: "Health" },
+  { id: "e24", title: "Course: AI agents", day: 5, start: 14, duration: 1.5, area: "Learning" },
+  { id: "e25", title: "Spanish practice", day: 6, start: 9, duration: 1, area: "Learning" },
   { id: "e13", title: "Call Mom", day: 6, start: 11, duration: 0.75, area: "Family" },
   { id: "e14", title: "Weekly review", day: 6, start: 18, duration: 0.75, area: "Admin" },
 ];
@@ -497,8 +508,8 @@ export interface Habit {
 
 export const SEED_HABITS: Habit[] = [
   { id: "r1", title: "Morning journal", streak: 12, week: [true, true, true, true, false, false, false] },
-  { id: "r2", title: "Move for 30 minutes", streak: 5, week: [true, false, true, true, false, false, false] },
-  { id: "r3", title: "Inbox zero by 6 PM", streak: 3, week: [true, true, false, true, false, false, false] },
+  { id: "r2", title: "Move 30 minutes", streak: 5, week: [true, false, true, true, false, false, false] },
+  { id: "r3", title: "Inbox zero", streak: 3, week: [true, true, false, true, false, false, false] },
   { id: "r4", title: "Read 20 pages", streak: 9, week: [true, true, true, false, false, false, false] },
   { id: "r5", title: "Lights out by 10:45", streak: 2, week: [false, true, true, true, false, false, false] },
 ];
@@ -578,16 +589,6 @@ export const RANGES: Record<RangeKey, RangeData> = {
 };
 
 export const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-
-export const WEEK_BY_AREA: { day: string; values: Record<LifeArea, number> }[] = [
-  { day: "Mon", values: { Work: 6.5, Health: 1, Learning: 0.5, Family: 1, Admin: 0.5 } },
-  { day: "Tue", values: { Work: 5.5, Health: 0.5, Learning: 1, Family: 1.5, Admin: 0.5 } },
-  { day: "Wed", values: { Work: 7, Health: 1, Learning: 0.5, Family: 1, Admin: 1 } },
-  { day: "Thu", values: { Work: 5, Health: 1, Learning: 1, Family: 2, Admin: 0.5 } },
-  { day: "Fri", values: { Work: 4.5, Health: 0.5, Learning: 0.5, Family: 3, Admin: 1 } },
-  { day: "Sat", values: { Work: 1, Health: 2.5, Learning: 1, Family: 4, Admin: 0.5 } },
-  { day: "Sun", values: { Work: 0.5, Health: 1, Learning: 1.5, Family: 4.5, Admin: 1 } },
-];
 
 export const ANALYTICS_INSIGHTS = [
   { title: "Your best focus is before 11 AM", detail: "62% of completed deep work happens in the morning. Keep meetings after 10." },

@@ -156,7 +156,7 @@ export default function PrivacyPage() {
         </div>
       </div>
 
-      <Modal open={confirming} onClose={() => setConfirming(false)} title="Erase all memories?" subtitle={`This removes ${memories} memories from your AI Brain.`}>
+      <Modal open={confirming} onClose={() => setConfirming(false)} title="Erase all memories?" subtitle={`This removes ${memories} memories from your AI Brain. You'll have a few seconds to undo it.`}>
         <div className="mt-5 flex justify-end gap-2">
           <Btn tone="ghost" onClick={() => setConfirming(false)}>
             Keep memories
@@ -166,7 +166,6 @@ export default function PrivacyPage() {
             onClick={() => {
               eraseMemories();
               setConfirming(false);
-              toast("All memories erased", "info");
             }}
           >
             Erase memories

@@ -1,4 +1,5 @@
-import { goalProgress, RANGES } from "./data";
+import { goalProgress } from "./data";
+import { liveStats } from "./stats";
 import type { ChatMessage, Store } from "./store";
 
 type Reply = Pick<ChatMessage, "text" | "link">;
@@ -50,7 +51,7 @@ export function companionReply(input: string, s: Store, today: number): Reply {
   }
 
   if (/progress|update|analytic|stats|week/.test(q)) {
-    const w = RANGES.week;
+    const w = liveStats(s, "week");
     return {
       text: `This week you logged ${w.focus} focus hours, up ${w.focusDelta}% on ${w.compare}. You finished ${w.tasks} tasks, and automations saved you ${w.saved}.`,
       link: { label: "See Life Analytics", href: "/analytics" },

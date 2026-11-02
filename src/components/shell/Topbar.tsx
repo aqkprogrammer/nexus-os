@@ -32,7 +32,7 @@ function Popover({ children, className }: { children: ReactNode; className?: str
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: -6, scale: 0.98 }}
       transition={{ duration: 0.16 }}
-      className={cn("nx-card absolute top-full right-0 z-40 mt-2 origin-top-right bg-[#150b30]", className)}
+      className={cn("nx-card nx-solid absolute top-full right-0 z-40 mt-2 origin-top-right", className)}
     >
       {children}
     </motion.div>
@@ -95,6 +95,7 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
       </button>
 
       <button
+        id="tour-search"
         type="button"
         onClick={() => setUi({ paletteOpen: true })}
         className="flex h-10 min-w-0 flex-1 cursor-text items-center gap-3 rounded-xl border border-line bg-white/3 px-3.5 text-left text-[0.8125rem] text-fg-3 transition-colors hover:border-line-strong lg:max-w-[33.5rem]"

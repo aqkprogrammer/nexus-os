@@ -8,3 +8,5 @@ next-env.d.ts
 .claude
 !.env.example
 AGENTS.md
+test-results
+playwright-report

@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { Flame, Plus, Trash2, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Legend } from "@/components/charts";
 import { Bar, Btn, Card, Check3, Modal, Page } from "@/components/ui";
 import { AREA_COLORS, AREAS, DAYS, type CalEvent, type LifeArea } from "@/lib/data";
@@ -19,9 +19,26 @@ const fmt = (h: number) => {
   return `${hour % 12 || 12}${mins ? `:${String(mins).padStart(2, "0")}` : ""}${hour >= 12 ? "pm" : "am"}`;
 };
 
+interface Drag {
+  event: CalEvent;
+  mode: "move" | "resize";
+  x: number;
+  y: number;
+  day: number;
+  start: number;
+  duration: number;
+  moved: boolean;
+}
+
+const snap = (hours: number) => Math.round(hours * 2) / 2;
+const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
+
 function WeekGrid({ onSlot, onOpen }: { onSlot: (day: number, hour: number) => void; onOpen: (e: CalEvent) => void }) {
   const events = useStore((s) => s.events);
+  const moveEvent = useStore((s) => s.moveEvent);
   const [now, setNow] = useState<Date | null>(null);
+  const [drag, setDrag] = useState<Drag | null>(null);
+  const overlay = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setNow(new Date());
@@ -32,6 +49,48 @@ function WeekGrid({ onSlot, onOpen }: { onSlot: (day: number, hour: number) => v
   const today = now ? weekdayIndex(now) : -1;
   const nowHour = now ? now.getHours() + now.getMinutes() / 60 : 0;
   const hours = Array.from({ length: LAST_HOUR - FIRST_HOUR }, (_, i) => FIRST_HOUR + i);
+
+  const begin = (e: React.PointerEvent, event: CalEvent, mode: Drag["mode"]) => {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    setDrag({ event, mode, x: e.clientX, y: e.clientY, day: event.day, start: event.start, duration: event.duration, moved: false });
+  };
+
+  const track = (e: React.PointerEvent) => {
+    if (!drag || !overlay.current) return;
+    const dx = e.clientX - drag.x;
+    const dy = e.clientY - drag.y;
+    const hourPx = HOUR_REM * parseFloat(getComputedStyle(document.documentElement).fontSize);
+    const dayPx = overlay.current.offsetWidth / DAYS.length;
+    const moved = drag.moved || Math.hypot(dx, dy) > 4;
+    const { event } = drag;
+    if (drag.mode === "move") {
+      setDrag({ ...drag, moved, day: clamp(event.day + Math.round(dx / dayPx), 0, 6), start: clamp(snap(event.start + dy / hourPx), FIRST_HOUR, LAST_HOUR - event.duration) });
+    } else {
+      setDrag({ ...drag, moved, duration: clamp(snap(event.duration + dy / hourPx), 0.5, LAST_HOUR - event.start) });
+    }
+  };
+
+  const finish = () => {
+    if (!drag) return;
+    if (drag.moved) moveEvent(drag.event.id, { day: drag.day, start: drag.start, duration: drag.duration });
+    else if (drag.mode === "move") onOpen(drag.event);
+    setDrag(null);
+  };
+
+  const nudge = (e: React.KeyboardEvent, event: CalEvent) => {
+    const { day, start, duration } = event;
+    const step = (patch: Partial<Pick<CalEvent, "day" | "start" | "duration">>) => {
+      e.preventDefault();
+      const next = { day, start, duration, ...patch };
+      moveEvent(event.id, { ...next, start: clamp(next.start, FIRST_HOUR, LAST_HOUR - next.duration) });
+    };
+    if (e.key === "ArrowLeft") step({ day: clamp(day - 1, 0, 6) });
+    if (e.key === "ArrowRight") step({ day: clamp(day + 1, 0, 6) });
+    if (e.key === "ArrowUp") step(e.shiftKey ? { duration: clamp(duration - 0.5, 0.5, 8) } : { start: start - 0.5 });
+    if (e.key === "ArrowDown") step(e.shiftKey ? { duration: clamp(duration + 0.5, 0.5, LAST_HOUR - start) } : { start: start + 0.5 });
+  };
 
   return (
     <div className="overflow-x-auto">
@@ -44,56 +103,82 @@ function WeekGrid({ onSlot, onOpen }: { onSlot: (day: number, hour: number) => v
             </span>
           ))}
         </div>
-        <div className="grid grid-cols-[3rem_repeat(7,minmax(0,1fr))]">
-          <div>
+        <div className="flex">
+          <div className="w-12 shrink-0">
             {hours.map((h) => (
               <div key={h} className="pr-2 text-right text-[0.6875rem] text-fg-3" style={{ height: `${HOUR_REM}rem` }}>
                 {fmt(h)}
               </div>
             ))}
           </div>
-          {DAYS.map((d, day) => (
-            <div key={d} className={cn("relative border-l border-white/5", day === today && "bg-nx-violet/7")}>
-              {hours.map((h) => (
-                <button
-                  key={h}
-                  type="button"
-                  aria-label={`Add event ${d} at ${fmt(h)}`}
-                  onClick={() => onSlot(day, h)}
-                  className="block w-full cursor-pointer border-b border-white/5 hover:bg-white/4"
-                  style={{ height: `${HOUR_REM}rem` }}
-                />
+          <div className="relative min-w-0 flex-1">
+            <div className="grid grid-cols-7">
+              {DAYS.map((d, day) => (
+                <div key={d} className={cn("border-l border-white/5", day === today && "bg-nx-violet/7")}>
+                  {hours.map((h) => (
+                    <button
+                      key={h}
+                      type="button"
+                      aria-label={`Add event ${d} at ${fmt(h)}`}
+                      onClick={() => onSlot(day, h)}
+                      className="block w-full cursor-pointer border-b border-white/5 hover:bg-white/4"
+                      style={{ height: `${HOUR_REM}rem` }}
+                    />
+                  ))}
+                </div>
               ))}
-              {events
-                .filter((e) => e.day === day)
-                .map((e, i) => (
+            </div>
+
+            <div ref={overlay} className="pointer-events-none absolute inset-0">
+              {events.map((event, i) => {
+                const live = drag?.event.id === event.id ? drag : null;
+                const day = live ? live.day : event.day;
+                const start = live ? live.start : event.start;
+                const duration = live ? live.duration : event.duration;
+                return (
                   <motion.button
-                    key={e.id}
+                    key={event.id}
                     type="button"
+                    data-event={event.title}
+                    aria-label={`${event.title}, ${DAYS[event.day]} at ${fmt(event.start)}. Arrow keys move it, Shift with up or down resizes it.`}
                     initial={{ opacity: 0, scale: 0.92 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: i * 0.03 + day * 0.02 }}
-                    whileHover={{ scale: 1.03 }}
-                    onClick={() => onOpen(e)}
-                    className="absolute inset-x-0.5 cursor-pointer overflow-hidden rounded-md border-l-[3px] px-1.5 py-0.5 text-left text-[0.6875rem] leading-tight text-fg"
+                    transition={{ delay: i * 0.02 }}
+                    onPointerDown={(e) => begin(e, event, "move")}
+                    onPointerMove={track}
+                    onPointerUp={finish}
+                    onPointerCancel={() => setDrag(null)}
+                    onClick={(e) => e.detail === 0 && onOpen(event)}
+                    onKeyDown={(e) => nudge(e, event)}
+                    className={cn(
+                      "pointer-events-auto absolute flex cursor-grab touch-none flex-col overflow-hidden rounded-md border-l-[3px] px-1.5 py-0.5 text-left text-[0.6875rem] leading-tight text-fg select-none hover:brightness-125",
+                      live?.moved && "z-20 cursor-grabbing shadow-[0_0.5rem_1.5rem_rgb(0_0_0_/_0.5)] ring-1 ring-nx-lilac",
+                    )}
                     style={{
-                      top: `${(e.start - FIRST_HOUR) * HOUR_REM}rem`,
-                      height: `${e.duration * HOUR_REM - 0.1}rem`,
-                      background: `${AREA_COLORS[e.area]}40`,
-                      borderColor: AREA_COLORS[e.area],
+                      left: `calc(${(day / DAYS.length) * 100}% + 0.125rem)`,
+                      width: `calc(${100 / DAYS.length}% - 0.25rem)`,
+                      top: `${(start - FIRST_HOUR) * HOUR_REM}rem`,
+                      height: `${duration * HOUR_REM - 0.1}rem`,
+                      background: `${AREA_COLORS[event.area]}40`,
+                      borderColor: AREA_COLORS[event.area],
                     }}
                   >
-                    <span className="block truncate font-medium">{e.title}</span>
-                    {e.duration >= 1 && <span className="block truncate text-fg-2">{fmt(e.start)}</span>}
+                    <span className="block truncate font-medium">{event.title}</span>
+                    {duration >= 1 && <span className="block truncate text-fg-2">{fmt(start)}</span>}
+                    <span onPointerDown={(e) => begin(e, event, "resize")} className="absolute inset-x-0 bottom-0 h-1.5 cursor-ns-resize" />
                   </motion.button>
-                ))}
-              {day === today && nowHour >= FIRST_HOUR && nowHour <= LAST_HOUR && (
-                <span className="pointer-events-none absolute inset-x-0 z-10 h-0.5 bg-nx-pink shadow-[0_0_0.5rem_#ec4bb8]" style={{ top: `${(nowHour - FIRST_HOUR) * HOUR_REM}rem` }}>
+                );
+              })}
+              {today >= 0 && nowHour >= FIRST_HOUR && nowHour <= LAST_HOUR && (
+                <span
+                  className="absolute z-10 h-0.5 bg-nx-pink shadow-[0_0_0.5rem_#ec4bb8]"
+                  style={{ top: `${(nowHour - FIRST_HOUR) * HOUR_REM}rem`, left: `${(today / DAYS.length) * 100}%`, width: `${100 / DAYS.length}%` }}
+                >
                   <span className="absolute -top-1 -left-1 size-2.5 animate-pulse rounded-full bg-nx-pink" />
                 </span>
               )}
             </div>
-          ))}
+          </div>
         </div>
       </div>
     </div>
@@ -197,7 +282,7 @@ export default function PlannerPage() {
           </Card>
         </div>
 
-        <Card id="week" title="This Week" subtitle="Click any empty slot to add an event." delay={0.14} className="scroll-mt-4" right={<div className="hidden md:block"><Legend /></div>}>
+        <Card id="week" title="This Week" subtitle="Drag to move, pull the bottom edge to resize, or click an empty slot to add." delay={0.14} className="scroll-mt-4" right={<div className="hidden md:block"><Legend /></div>}>
           <WeekGrid
             onSlot={(day, start) => setSlot({ day, start })}
             onOpen={setOpened}
@@ -280,7 +365,6 @@ export default function PlannerPage() {
             onClick={() => {
               if (opened) removeEvent(opened.id);
               setOpened(null);
-              toast("Event removed", "info");
             }}
           >
             <Trash2 className="size-4" /> Remove event

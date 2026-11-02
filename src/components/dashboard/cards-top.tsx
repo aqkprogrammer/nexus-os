@@ -9,6 +9,7 @@ import { AreaChart } from "@/components/charts";
 import { Mascot } from "@/components/Mascot";
 import { Btn, Card, Check3, CountUp, Ring } from "@/components/ui";
 import { ACTION_ICONS, goalProgress, RANGES, type RangeKey } from "@/lib/data";
+import { useLiveStats } from "@/lib/stats";
 import { useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
@@ -47,7 +48,7 @@ export function ActionCenter() {
   const setUi = useStore((s) => s.setUi);
 
   return (
-    <Card n={2} title="Action Center" subtitle={<span className="text-nx-pink">{actions.length ? `${actions.length} awaiting your review` : "All clear"}</span>} delay={0.14}>
+    <Card id="tour-actions" n={2} title="Action Center" subtitle={<span className="text-nx-pink">{actions.length ? `${actions.length} awaiting your review` : "All clear"}</span>} delay={0.14}>
       <ul className="mt-1 flex-1">
         <AnimatePresence initial={false}>
           {actions.slice(0, 4).map((a) => {
@@ -145,7 +146,7 @@ const count = (v: number) => Math.round(v).toLocaleString("en-US");
 
 export function AnalyticsOverview() {
   const [range, setRange] = useState<RangeKey>("week");
-  const d = RANGES[range];
+  const d = useLiveStats(range);
   const up = d.focusDelta >= 0;
   const tip = useCallback((v: number) => `${v.toFixed(1)} hrs`, []);
 
@@ -157,7 +158,7 @@ export function AnalyticsOverview() {
       </div>
       <p className="flex items-center gap-1 text-[0.6875rem] text-fg-3">
         {up ? <ArrowUp className="size-3 text-nx-green" /> : <ArrowDown className="size-3 text-nx-rose" />}
-        <span className="text-nx-green">{Math.abs(d.focusDelta)}%</span> vs {d.compare}
+        <span className={up ? "text-nx-green" : "text-nx-rose"}>{Math.abs(d.focusDelta)}%</span> vs {d.compare}
       </p>
       <AreaChart data={d.series} labels={d.labels} format={tip} label={`Focus time ${d.label}`} className="my-1 min-h-[2.6rem] flex-1" color="#c084fc" />
       <dl className="grid grid-cols-2 gap-2 text-[0.6875rem]">
@@ -195,7 +196,7 @@ export function GoalRadar() {
   };
 
   return (
-    <Card n={4} tone="violet" title="Goal Intelligence" delay={0.26}>
+    <Card id="tour-goals" n={4} tone="violet" title="Goal Intelligence" delay={0.26}>
       <p className="text-xs text-fg-2">Goals that need you</p>
       <ul className="mt-1 flex-1 space-y-0.5">
         {goals.slice(0, 4).map((g, i) => {

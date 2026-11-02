@@ -183,10 +183,7 @@ export default function BrainPage() {
                     <button
                       type="button"
                       aria-label={`Delete ${m.title}`}
-                      onClick={() => {
-                        removeMemory(m.id);
-                        toast("Memory deleted", "info");
-                      }}
+                      onClick={() => removeMemory(m.id)}
                       className="cursor-pointer text-fg-3 hover:text-nx-rose"
                     >
                       <Trash2 className="size-4" />

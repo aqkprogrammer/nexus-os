@@ -56,6 +56,7 @@ export interface Toast {
   id: string;
   text: string;
   tone: "good" | "info" | "warn";
+  action?: { label: string; run: () => void };
 }
 
 interface Profile {
@@ -80,6 +81,14 @@ interface Privacy {
 
 const SEED_CHAT: ChatMessage[] = [];
 const MAX_SAVED_MESSAGES = 60;
+const TOAST_MS = 3600;
+const UNDO_TOAST_MS = 7000;
+
+function reinsert<T>(list: T[], item: T, index: number) {
+  const next = [...list];
+  next.splice(Math.min(index, next.length), 0, item);
+  return next;
+}
 
 const seed = () => ({
   priorities: SEED_PRIORITIES,
@@ -102,6 +111,7 @@ const seed = () => ({
   privateMode: true,
   safeMode: true,
   online: true,
+  tourDone: false,
 });
 
 export interface Store extends ReturnType<typeof seed> {
@@ -116,7 +126,7 @@ export interface Store extends ReturnType<typeof seed> {
   chatMode: "live" | "demo" | null;
   selectedGoal: string;
 
-  toast: (text: string, tone?: Toast["tone"]) => void;
+  toast: (text: string, tone?: Toast["tone"], action?: Toast["action"]) => void;
   dismissToast: (id: string) => void;
   setUi: (patch: Partial<Pick<Store, "launch" | "reviewing" | "briefOpen" | "paletteOpen" | "chatExpanded" | "chatStatus" | "chatMode" | "selectedGoal">>) => void;
 
@@ -141,6 +151,7 @@ export interface Store extends ReturnType<typeof seed> {
   scheduleNext: (goalId: string) => void;
 
   addEvent: (e: Omit<CalEvent, "id">) => void;
+  moveEvent: (id: string, patch: Pick<CalEvent, "day" | "start" | "duration">) => void;
   removeEvent: (id: string) => void;
   toggleHabit: (id: string, day: number) => void;
 
@@ -164,6 +175,7 @@ export interface Store extends ReturnType<typeof seed> {
   setPrefs: (p: Partial<Prefs>) => void;
   setPrivacy: (p: Partial<Privacy>) => void;
   setPill: (key: "privateMode" | "safeMode" | "online", value: boolean) => void;
+  setTourDone: (done: boolean) => void;
   resetDemo: () => void;
 }
 
@@ -205,10 +217,10 @@ export const useStore = create<Store>()(
       chatMode: null,
       selectedGoal: "g1",
 
-      toast: (text, tone = "good") => {
+      toast: (text, tone = "good", action) => {
         const id = uid();
-        set((s) => ({ toasts: [...s.toasts.slice(-2), { id, text, tone }] }));
-        setTimeout(() => get().dismissToast(id), 3600);
+        set((s) => ({ toasts: [...s.toasts.slice(-2), { id, text, tone, action }] }));
+        setTimeout(() => get().dismissToast(id), action ? UNDO_TOAST_MS : TOAST_MS);
       },
       dismissToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
       setUi: (patch) => set(patch),
@@ -217,7 +229,13 @@ export const useStore = create<Store>()(
         set((s) => ({ priorities: s.priorities.map((p) => (p.id === id ? { ...p, done: !p.done } : p)) })),
       addPriority: (title) =>
         set((s) => ({ priorities: [...s.priorities, { id: uid(), title, done: false } satisfies Priority] })),
-      removePriority: (id) => set((s) => ({ priorities: s.priorities.filter((p) => p.id !== id) })),
+      removePriority: (id) => {
+        const index = get().priorities.findIndex((p) => p.id === id);
+        if (index < 0) return;
+        const item = get().priorities[index];
+        set((s) => ({ priorities: s.priorities.filter((p) => p.id !== id) }));
+        get().toast("Task removed", "info", { label: "Undo", run: () => set((s) => ({ priorities: reinsert(s.priorities, item, index) })) });
+      },
 
       resolveAction: (id, outcome) => {
         const item = get().actions.find((a) => a.id === id);
@@ -251,10 +269,20 @@ export const useStore = create<Store>()(
         };
         set((s) => ({ memories: [m, ...s.memories] }));
       },
-      removeMemory: (id) => set((s) => ({ memories: s.memories.filter((m) => m.id !== id) })),
+      removeMemory: (id) => {
+        const index = get().memories.findIndex((m) => m.id === id);
+        if (index < 0) return;
+        const item = get().memories[index];
+        set((s) => ({ memories: s.memories.filter((m) => m.id !== id) }));
+        get().toast("Memory deleted", "info", { label: "Undo", run: () => set((s) => ({ memories: reinsert(s.memories, item, index) })) });
+      },
       togglePin: (id) =>
         set((s) => ({ memories: s.memories.map((m) => (m.id === id ? { ...m, pinned: !m.pinned } : m)) })),
-      eraseMemories: () => set({ memories: [] }),
+      eraseMemories: () => {
+        const erased = get().memories;
+        set({ memories: [] });
+        get().toast("All memories erased", "info", { label: "Undo", run: () => set({ memories: erased }) });
+      },
 
       addIdea: (title, tag) =>
         set((s) => ({ ideas: [{ id: uid(), title, tag, starred: false } satisfies Idea, ...s.ideas] })),
@@ -298,7 +326,13 @@ export const useStore = create<Store>()(
       },
 
       addEvent: (e) => set((s) => ({ events: [...s.events, { ...e, id: uid() }] })),
-      removeEvent: (id) => set((s) => ({ events: s.events.filter((e) => e.id !== id) })),
+      moveEvent: (id, patch) => set((s) => ({ events: s.events.map((e) => (e.id === id ? { ...e, ...patch } : e)) })),
+      removeEvent: (id) => {
+        const item = get().events.find((e) => e.id === id);
+        if (!item) return;
+        set((s) => ({ events: s.events.filter((e) => e.id !== id) }));
+        get().toast("Event removed", "info", { label: "Undo", run: () => set((s) => ({ events: [...s.events, item] })) });
+      },
       toggleHabit: (id, day) =>
         set((s) => ({
           habits: s.habits.map((h: Habit) => {
@@ -391,6 +425,7 @@ export const useStore = create<Store>()(
       setPrefs: (p) => set((s) => ({ prefs: { ...s.prefs, ...p } })),
       setPrivacy: (p) => set((s) => ({ privacy: { ...s.privacy, ...p } })),
       setPill: (key, value) => set({ [key]: value } as Pick<Store, typeof key>),
+      setTourDone: (done) => set({ tourDone: done }),
       resetDemo: () => set(seed()),
     }),
     {

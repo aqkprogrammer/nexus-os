@@ -108,7 +108,7 @@ export function CommandPalette() {
             animate={{ y: 0, scale: 1 }}
             exit={{ y: -8, scale: 0.98 }}
             transition={{ type: "spring", stiffness: 420, damping: 34 }}
-            className="nx-card w-full max-w-xl bg-[#150b30]"
+            className="nx-card nx-solid w-full max-w-xl"
           >
             <div className="flex items-center gap-3 border-b border-line px-4">
               <Search className="size-5 text-fg-3" />

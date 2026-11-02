@@ -1,4 +1,5 @@
-import { agentById, DAYS, goalProgress, RANGES } from "./data";
+import { agentById, DAYS, goalProgress } from "./data";
+import { liveStats } from "./stats";
 import type { Store } from "./store";
 import { weekdayIndex } from "./utils";
 
@@ -6,7 +7,7 @@ const MAX_MEMORIES = 40;
 
 /** A compact snapshot of the workspace. Until there's a database, the browser owns this data. */
 export function buildContext(s: Store, now = new Date()) {
-  const week = RANGES.week;
+  const week = liveStats(s, "week");
   return {
     user: { name: s.profile.name, tone: s.profile.companionTone },
     now: {

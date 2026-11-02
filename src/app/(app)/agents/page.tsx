@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Bar, Btn, Card, enter, Modal, Page, Pill, Stat } from "@/components/ui";
 import { AGENTS, agentById, RUN_STEPS, type AgentDef } from "@/lib/data";
+import { useLiveStats } from "@/lib/stats";
 import { useStore, type AgentRun } from "@/lib/store";
 import { cn, timeAgo } from "@/lib/utils";
 
@@ -39,6 +40,8 @@ export default function AgentsPage() {
   const setUi = useStore((s) => s.setUi);
   const [detail, setDetail] = useState<AgentDef | null>(null);
 
+  const { saved } = useLiveStats();
+
   const running = runs.filter((r) => r.status === "running");
   const busy = new Set(running.map((r) => r.agent));
   const totalRuns = Object.values(BASE_RUNS).reduce((a, b) => a + b, 0) + runs.length;
@@ -57,7 +60,7 @@ export default function AgentsPage() {
         <Stat label="Working now" value={running.length} note={running.length ? "Live below" : "All agents ready"} />
         <Stat label="Total runs" value={totalRuns.toLocaleString("en-US")} note="Since you joined" delay={0.05} />
         <Stat label="Awaiting approval" value={pending} note={<Link href="/actions" className="text-nx-lilac hover:underline">Open Action Center</Link>} delay={0.1} />
-        <Stat label="Time saved" value="6h 40m" note="This week" delay={0.15} />
+        <Stat label="Time saved" value={saved} note="This week" delay={0.15} />
       </div>
 
       <div className="grid gap-3 2xl:grid-cols-[minmax(0,1fr)_24rem]">

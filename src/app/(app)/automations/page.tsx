@@ -5,6 +5,7 @@ import { ArrowDown, ArrowRight, Check, Play, Plus, Zap } from "lucide-react";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { Btn, Card, Modal, Page, Pill, Stat, Toggle, enter } from "@/components/ui";
 import { APPS, WORKFLOW_TEMPLATES, type Workflow } from "@/lib/data";
+import { useLiveStats } from "@/lib/stats";
 import { useStore } from "@/lib/store";
 import { cn, timeAgo } from "@/lib/utils";
 
@@ -53,6 +54,7 @@ export default function AutomationsPage() {
   const addWorkflow = useStore((s) => s.addWorkflow);
   const toast = useStore((s) => s.toast);
 
+  const { saved } = useLiveStats();
   const [selected, setSelected] = useState("w1");
   const [step, setStep] = useState<number | null>(null);
   const [log, setLog] = useState<{ id: string; text: string }[]>([]);
@@ -106,7 +108,7 @@ export default function AutomationsPage() {
         <Stat label="Active workflows" value={`${active} of ${workflows.length}`} note="Running on schedule" />
         <Stat label="Connected apps" value={`${connected} of ${APPS.length}`} note="Through MCP connectors" delay={0.05} />
         <Stat label="Total runs" value={totalRuns.toLocaleString("en-US")} note="All time" delay={0.1} />
-        <Stat label="Time saved" value="6h 40m" note="This week" delay={0.15} />
+        <Stat label="Time saved" value={saved} note="This week" delay={0.15} />
       </div>
 
       <div className="grid gap-3 xl:grid-cols-[24rem_minmax(0,1fr)]">

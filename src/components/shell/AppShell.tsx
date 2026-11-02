@@ -6,6 +6,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { CommandPalette } from "@/components/shell/CommandPalette";
 import { GlobalModals } from "@/components/shell/GlobalModals";
 import { Sidebar } from "@/components/shell/Sidebar";
+import { Tour } from "@/components/shell/Tour";
 import { Topbar } from "@/components/shell/Topbar";
 import { Toaster } from "@/components/ui";
 import { useStore } from "@/lib/store";
@@ -74,6 +75,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       )}
 
+      {ready && <Tour />}
       <CommandPalette />
       <GlobalModals />
       <Toaster />

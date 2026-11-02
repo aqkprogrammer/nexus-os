@@ -1,7 +1,8 @@
 "use client";
 
 import { motion } from "motion/react";
-import { CheckCircle2, Circle, Crown, LoaderCircle, Monitor, RotateCcw, Smartphone, Tablet } from "lucide-react";
+import { CheckCircle2, Circle, Compass, Crown, LoaderCircle, Monitor, RotateCcw, Smartphone, Tablet } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Bar, Btn, Card, Modal, Page, Pill, Toggle } from "@/components/ui";
 import { ROADMAP } from "@/lib/data";
@@ -36,6 +37,8 @@ export default function SettingsPage() {
   const resetDemo = useStore((s) => s.resetDemo);
   const memories = useStore((s) => s.memories.length);
   const toast = useStore((s) => s.toast);
+  const setTourDone = useStore((s) => s.setTourDone);
+  const router = useRouter();
   const [confirming, setConfirming] = useState(false);
   const used = Math.min(100, 57 + memories);
 
@@ -118,7 +121,16 @@ export default function SettingsPage() {
         </Card>
 
         <Card title="Demo Data" subtitle="Everything you change is saved in this browser." delay={0.25}>
-          <div className="pt-1">
+          <div className="flex flex-wrap gap-2 pt-1">
+            <Btn
+              tone="ghost"
+              onClick={() => {
+                setTourDone(false);
+                router.push("/");
+              }}
+            >
+              <Compass className="size-4" /> Replay tour
+            </Btn>
             <Btn tone="rose" onClick={() => setConfirming(true)}>
               <RotateCcw className="size-4" /> Reset demo data
             </Btn>

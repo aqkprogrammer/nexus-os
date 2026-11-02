@@ -5,13 +5,14 @@ import { Sparkles } from "lucide-react";
 import { useCallback } from "react";
 import { AreaChart } from "@/components/charts";
 import { Card, Ring } from "@/components/ui";
-import { RANGES } from "@/lib/data";
+import { useLiveStats } from "@/lib/stats";
 
 const SERIES = [8, 11, 9, 13, 12, 16, 15, 20, 19, 26, 25, 33, 38, 52];
 const LABELS = SERIES.map((_, i) => `Week ${i + 1}`);
 
 export function DailyInsight() {
   const tip = useCallback((v: number) => `${v} hrs saved`, []);
+  const { saved } = useLiveStats();
   return (
     <Card
       delay={0.46}
@@ -24,7 +25,7 @@ export function DailyInsight() {
       bodyClass="relative !px-5"
     >
       <p className="mt-2 text-[0.8125rem] leading-5 text-fg-2">
-        You saved {RANGES.week.saved} this week with
+        You saved {saved} this week with
         <br />
         smarter automations.
       </p>

@@ -227,7 +227,7 @@ export function Companion() {
 
   return (
     <>
-      <motion.section {...enter(0.3)} aria-label="Nexus companion" className="nx-card flex min-h-0 flex-col">
+      <motion.section {...enter(0.3)} id="tour-companion" aria-label="Nexus companion" className="nx-card flex min-h-0 flex-col">
         {!expanded && <ChatBody expanded={false} />}
       </motion.section>
       {mounted &&
@@ -240,7 +240,7 @@ export function Companion() {
                   animate={{ scale: 1, y: 0 }}
                   exit={{ scale: 0.97, y: 8 }}
                   transition={{ type: "spring", stiffness: 340, damping: 30 }}
-                  className="nx-card flex h-[85vh] w-full max-w-3xl flex-col bg-[#120a28]"
+                  className="nx-card nx-solid flex h-[85vh] w-full max-w-3xl flex-col"
                 >
                   <ChatBody expanded />
                 </motion.div>

@@ -137,7 +137,7 @@ export function Legend({ areas = AREAS }: { areas?: LifeArea[] }) {
 export function StackedBars({ rows }: { rows: { day: string; values: Record<LifeArea, number> }[] }) {
   const [hover, setHover] = useState<string | null>(null);
   const totals = rows.map((r) => AREAS.reduce((sum, a) => sum + r.values[a], 0));
-  const max = Math.ceil(Math.max(...totals) / 4) * 4;
+  const max = Math.max(4, Math.ceil(Math.max(...totals) / 4) * 4);
   const ticks = [0, max / 2, max];
 
   return (
@@ -220,7 +220,7 @@ export function Heatmap({ weeks }: { weeks: number[][] }) {
               {week.map((v, d) => (
                 <motion.span
                   key={d}
-                  title={`Week ${w + 1}, ${["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][d]}: ${v} of 4 habits`}
+                  title={`Week ${w + 1}, ${["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][d]}: ${v} ${v === 1 ? "routine" : "routines"}`}
                   initial={{ opacity: 0, scale: 0.5 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: w * 0.02 + d * 0.01 }}

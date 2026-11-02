@@ -5,7 +5,8 @@ import { Lightbulb } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { AreaChart, Heatmap, Legend, StackedBars } from "@/components/charts";
 import { Card, CountUp, Page, Segmented, Stat } from "@/components/ui";
-import { ANALYTICS_INSIGHTS, AREA_COLORS, AREAS, RANGES, WEEK_BY_AREA, type RangeKey } from "@/lib/data";
+import { ANALYTICS_INSIGHTS, AREA_COLORS, AREAS, DAYS, RANGES, type RangeKey } from "@/lib/data";
+import { hoursByDay, useLiveStats } from "@/lib/stats";
 import { useStore } from "@/lib/store";
 
 const OPTIONS = (Object.keys(RANGES) as RangeKey[]).map((value) => ({ value, label: RANGES[value].label }));
@@ -24,23 +25,26 @@ const HEAT_WEEKS = Array.from({ length: 16 }, (_, w) =>
 export default function AnalyticsPage() {
   const [range, setRange] = useState<RangeKey>("week");
   const [view, setView] = useState<"chart" | "table">("chart");
-  const d = RANGES[range];
+  const d = useLiveStats(range);
   const habits = useStore((s) => s.habits);
   const goals = useStore((s) => s.goals);
+  const events = useStore((s) => s.events);
+  const byDay = useMemo(() => hoursByDay(events), [events]);
 
-  const totals = useMemo(() => AREAS.map((a) => ({ area: a, hours: WEEK_BY_AREA.reduce((sum, r) => sum + r.values[a], 0) })).sort((x, y) => y.hours - x.hours), []);
-  const maxArea = totals[0].hours;
+  const totals = useMemo(() => AREAS.map((a) => ({ area: a, hours: byDay.reduce((sum, r) => sum + r.values[a], 0) })).sort((x, y) => y.hours - x.hours), [byDay]);
+  const maxArea = totals[0].hours || 1;
   const tip = useCallback((v: number) => (range === "week" ? `${v.toFixed(1)} hrs` : `${v.toFixed(0)} hrs`), [range]);
 
   const logged = habits.flatMap((h) => h.week).filter(Boolean).length;
+  const thisWeek = DAYS.map((_, day) => Math.min(4, habits.filter((h) => h.week[day]).length));
 
   return (
     <Page title="Life Analytics" subtitle="Progress, productivity and insights." actions={<Segmented id="range" value={range} options={OPTIONS} onChange={setRange} />}>
       <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="Focus time" value={<CountUp key={range} to={d.focus} format={hours} />} note={`Up ${d.focusDelta}% vs ${d.compare}`} />
-        <Stat label="Tasks done" value={<CountUp key={range} to={d.tasks} format={whole} />} note={d.tasksNote} delay={0.05} />
+        <Stat label="Focus time" value={<CountUp to={d.focus} format={hours} />} note={`${d.focusDelta >= 0 ? "Up" : "Down"} ${Math.abs(d.focusDelta)}% vs ${d.compare}`} />
+        <Stat label="Tasks done" value={<CountUp to={d.tasks} format={whole} />} note={d.tasksNote} delay={0.05} />
         <Stat label="Time saved by agents" value={d.saved} note="Automations and agent runs" delay={0.1} />
-        <Stat label="Plan completion" value={<CountUp key={range} to={d.completion} format={percent} />} note={`Across ${goals.length} active goals`} delay={0.15} />
+        <Stat label="Plan completion" value={<CountUp to={d.completion} format={percent} />} note={`Across ${goals.length} active goals`} delay={0.15} />
       </div>
 
       <div className="grid gap-3 xl:grid-cols-5">
@@ -50,7 +54,7 @@ export default function AnalyticsPage() {
 
         <Card
           title="Time by Life Area"
-          subtitle="Hours per day, this week"
+          subtitle="Scheduled hours per day, from your calendar"
           delay={0.16}
           className="!overflow-visible xl:col-span-2"
           right={
@@ -70,7 +74,7 @@ export default function AnalyticsPage() {
               <div className="mb-2 mt-1">
                 <Legend />
               </div>
-              <StackedBars rows={WEEK_BY_AREA} />
+              <StackedBars rows={byDay} />
             </>
           ) : (
             <div className="overflow-x-auto">
@@ -87,7 +91,7 @@ export default function AnalyticsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {WEEK_BY_AREA.map((r) => (
+                  {byDay.map((r) => (
                     <tr key={r.day} className="border-t border-white/6 text-fg-2">
                       <th className="py-1.5 text-left font-medium text-fg">{r.day}</th>
                       {AREAS.map((a) => (
@@ -103,7 +107,7 @@ export default function AnalyticsPage() {
           )}
         </Card>
 
-        <Card title="Weekly Balance" subtitle="Total hours by life area" delay={0.2} className="xl:col-span-2">
+        <Card title="Weekly Balance" subtitle="Scheduled hours by life area" delay={0.2} className="xl:col-span-2">
           <ul className="mt-1 space-y-2.5">
             {totals.map((t, i) => (
               <li key={t.area} className="grid grid-cols-[4.5rem_minmax(0,1fr)_3rem] items-center gap-2 text-xs">
@@ -117,14 +121,16 @@ export default function AnalyticsPage() {
                     transition={{ duration: 0.8, delay: i * 0.06, ease: "easeOut" }}
                   />
                 </span>
-                <span className="text-right text-fg tabular-nums">{t.hours} hrs</span>
+                <span className="text-right text-fg tabular-nums">
+                  {t.hours} {t.hours === 1 ? "hr" : "hrs"}
+                </span>
               </li>
             ))}
           </ul>
         </Card>
 
         <Card title="Routine Consistency" subtitle={`${logged} check-ins logged this week`} delay={0.24} className="xl:col-span-3">
-          <Heatmap weeks={HEAT_WEEKS} />
+          <Heatmap weeks={[...HEAT_WEEKS.slice(0, -1), thisWeek]} />
         </Card>
 
         <Card title="What Nexus Noticed" delay={0.28} className="xl:col-span-5" bodyClass="!pt-1">

@@ -138,6 +138,11 @@ body {
   opacity: 1;
 }
 
+/* For surfaces that float above the page and must hide what's underneath */
+.nx-solid {
+  background: #150b30;
+}
+
 /* A smaller nested tile */
 .nx-tile {
   border-radius: 0.625rem;
