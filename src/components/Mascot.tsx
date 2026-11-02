@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef } from "react";
+import { useEffect, useId, useMemo, useRef, type CSSProperties } from "react";
 import { cn } from "@/lib/utils";
 
 const CURLS: [number, number, number][] = (() => {
@@ -57,6 +57,14 @@ function Eye({ cx, cy, flip, ids }: { cx: number; cy: number; flip?: boolean; id
           strokeLinecap="round"
         />
       </g>
+      <path
+        className="mascot-lid"
+        d={`M${cx - 28} ${cy + 4} Q${cx} ${cy + 24} ${cx + 28} ${cy + 4} M${cx + dir * 26} ${cy + 9} l${dir * 11} -6`}
+        fill="none"
+        stroke="#130805"
+        strokeWidth="6"
+        strokeLinecap="round"
+      />
     </g>
   );
 }
@@ -98,6 +106,9 @@ export function Mascot({ variant = "full", className, track = false, title = "Ne
 
   const full = variant === "full";
 
+  // Each mascot blinks on its own rhythm, so they never all blink together.
+  const blinkDelay = useMemo(() => -[...raw].reduce((sum, c, i) => sum + c.charCodeAt(0) * (i + 7), 0) % 540 / 100, [raw]);
+
   return (
     <svg
       ref={svgRef}
@@ -105,6 +116,7 @@ export function Mascot({ variant = "full", className, track = false, title = "Ne
       className={cn("overflow-visible", className)}
       role="img"
       aria-label={title}
+      style={{ "--blink-delay": `${blinkDelay}s` } as CSSProperties}
     >
       <defs>
         <linearGradient id={ids.skin} x1="0" y1="0" x2="0" y2="1">
@@ -220,6 +232,9 @@ export function Mascot({ variant = "full", className, track = false, title = "Ne
           </g>
         ))}
 
+        {/* Headband, tucked under the bangs so it doesn't tangle with the halo */}
+        <path d="M72 168 C60 30 300 30 288 168" fill="none" stroke={`url(#${ids.band})`} strokeWidth="13" strokeLinecap="round" />
+
         {/* Face */}
         <path
           d="M86 168 C86 96 274 96 274 168 C274 228 226 262 180 262 C134 262 86 228 86 168 Z"
@@ -248,7 +263,6 @@ export function Mascot({ variant = "full", className, track = false, title = "Ne
         ))}
 
         {/* Headphones */}
-        <path d="M72 168 C60 30 300 30 288 168" fill="none" stroke={`url(#${ids.band})`} strokeWidth="13" strokeLinecap="round" />
         {[0, 1].map((side) => (
           <g key={side} transform={side ? "translate(360 0) scale(-1 1)" : undefined}>
             <rect x="50" y="130" width="50" height="94" rx="24" fill={`url(#${ids.cup})`} />

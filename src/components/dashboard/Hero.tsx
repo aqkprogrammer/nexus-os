@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "motion/react";
-import { CalendarDays, Clock, Heart, Home, Sparkles, Star, Sun, Zap } from "lucide-react";
+import { CalendarDays, Clock, Heart, Home, Star, Sun, Zap } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Galaxy } from "@/components/Galaxy";
 import { Mascot } from "@/components/Mascot";
@@ -9,12 +9,13 @@ import { enter } from "@/components/ui";
 import { useStore } from "@/lib/store";
 import { greeting } from "@/lib/utils";
 
+// Measured from the top of the mascot, so the arc clears its head and halo.
 const ORBS = [
-  { icon: Star, x: "-8.3rem", y: "2.6rem", color: "#fbb024", size: "1.45rem", delay: 0.3 },
-  { icon: Heart, x: "-5.2rem", y: "0.9rem", color: "#ff5cc0", size: "1.7rem", delay: 0.8 },
-  { icon: Zap, x: "-0.1rem", y: "-0.3rem", color: "#c084fc", size: "2.1rem", delay: 0 },
-  { icon: Home, x: "5rem", y: "0.9rem", color: "#60a5fa", size: "1.7rem", delay: 1.2 },
-  { icon: Star, x: "8.2rem", y: "2.6rem", color: "#fbb024", size: "1.45rem", delay: 0.6 },
+  { icon: Star, x: "-7.2rem", y: "2.5rem", color: "#fbb024", size: "1.45rem", delay: 0.3 },
+  { icon: Heart, x: "-5.4rem", y: "0.4rem", color: "#ff5cc0", size: "1.7rem", delay: 0.8 },
+  { icon: Zap, x: "0rem", y: "-2rem", color: "#c084fc", size: "1.6rem", delay: 0 },
+  { icon: Home, x: "5.4rem", y: "0.4rem", color: "#60a5fa", size: "1.7rem", delay: 1.2 },
+  { icon: Star, x: "7.2rem", y: "2.5rem", color: "#fbb024", size: "1.45rem", delay: 0.6 },
 ];
 
 export function Hero() {
@@ -30,7 +31,7 @@ export function Hero() {
   return (
     <motion.section {...enter()} className="relative h-[13rem] overflow-visible rounded-2xl max-md:h-[20rem]">
       <div
-        className="absolute inset-0 overflow-hidden rounded-2xl"
+        className="nx-hero-bg absolute inset-0 overflow-hidden rounded-2xl"
         style={{
           background:
             "radial-gradient(11rem 8rem at 67.5% 62%, rgb(214 120 255 / 0.62), transparent 72%), radial-gradient(30rem 11rem at 66% 62%, rgb(132 50 235 / 0.68), transparent 72%), radial-gradient(22rem 9rem at 92% 22%, rgb(236 75 184 / 0.3), transparent 72%), radial-gradient(26rem 8rem at 42% 104%, rgb(70 60 235 / 0.4), transparent 72%)",
@@ -66,7 +67,7 @@ export function Hero() {
       <div className="absolute bottom-0 left-[67.5%] -translate-x-1/2 max-md:left-[72%]">
         <div className="relative animate-float">
           {ORBS.map((o, i) => (
-            <span key={i} className="absolute top-[-0.5rem] left-1/2 max-md:hidden" style={{ transform: `translate(calc(-50% + ${o.x}), ${o.y})` }}>
+            <span key={i} className="absolute top-0 left-1/2 max-md:hidden" style={{ transform: `translate(calc(-50% + ${o.x}), ${o.y})` }}>
               <motion.span
                 className="block"
                 animate={{ y: [0, -5, 0] }}
@@ -79,8 +80,7 @@ export function Hero() {
               </motion.span>
             </span>
           ))}
-          <Mascot track className="h-[11.7rem] w-auto max-md:h-[9rem]" />
-          <Sparkles className="absolute top-20 -right-6 size-4 animate-twinkle text-white" />
+          <Mascot track className="h-[10.5rem] w-auto max-md:h-[9rem]" />
         </div>
       </div>
     </motion.section>

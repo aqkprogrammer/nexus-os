@@ -228,3 +228,25 @@ test.describe("AI chat", () => {
     await expect(chat(page).getByRole("button", { name: "Try again" })).toHaveCount(0);
   });
 });
+
+test.describe("top bar menus", () => {
+  for (const [button, content] of [
+    [/^Notifications/, "Mark all read"],
+    [/Brandon/, "Profile & settings"],
+  ] as const) {
+    test(`${content} opens below the bar without moving it`, async ({ page }) => {
+      await page.goto("/");
+      const trigger = page.getByRole("banner").getByRole("button", { name: button });
+      const pill = page.getByRole("button", { name: "Safe Mode" });
+      const before = (await pill.boundingBox())!;
+      const triggerBox = (await trigger.boundingBox())!;
+
+      await trigger.click();
+      const item = page.getByText(content);
+      await expect(item).toBeVisible();
+
+      expect((await item.boundingBox())!.y).toBeGreaterThan(triggerBox.y + triggerBox.height - 1);
+      expect(await pill.boundingBox()).toEqual(before);
+    });
+  }
+});

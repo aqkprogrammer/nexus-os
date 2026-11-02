@@ -100,190 +100,193 @@ body {
   animation-direction: alternate-reverse;
 }
 
-/* Cards */
-.nx-card {
-  position: relative;
-  isolation: isolate;
-  overflow: hidden;
-  border-radius: 1rem;
-  border: 1px solid var(--color-line);
-  background: linear-gradient(165deg, rgb(34 19 72 / 0.66), rgb(13 7 31 / 0.82));
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.04),
-    0 0.5rem 2rem rgb(0 0 0 / 0.32);
-  transition:
-    border-color 0.25s,
-    box-shadow 0.25s;
-}
+/* Layered so that utility classes can override these styles. */
+@layer components {
+  /* Cards */
+  .nx-card {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    border-radius: 1rem;
+    border: 1px solid var(--color-line);
+    background: linear-gradient(165deg, rgb(34 19 72 / 0.66), rgb(13 7 31 / 0.82));
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.04),
+      0 0.5rem 2rem rgb(0 0 0 / 0.32);
+    transition:
+      border-color 0.25s,
+      box-shadow 0.25s;
+  }
 
-.nx-card::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  opacity: 0;
-  background: radial-gradient(15rem circle at var(--mx, 50%) var(--my, 0%), rgb(170 110 255 / 0.17), transparent 72%);
-  transition: opacity 0.3s;
-}
+  .nx-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    opacity: 0;
+    background: radial-gradient(15rem circle at var(--mx, 50%) var(--my, 0%), rgb(170 110 255 / 0.17), transparent 72%);
+    transition: opacity 0.3s;
+  }
 
-.nx-card:hover {
-  border-color: var(--color-line-strong);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.06),
-    0 0 1.75rem rgb(139 92 246 / 0.2);
-}
+  .nx-card:hover {
+    border-color: var(--color-line-strong);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.06),
+      0 0 1.75rem rgb(139 92 246 / 0.2);
+  }
 
-.nx-card:hover::before {
-  opacity: 1;
-}
+  .nx-card:hover::before {
+    opacity: 1;
+  }
 
-/* For surfaces that float above the page and must hide what's underneath */
-.nx-solid {
-  background: #150b30;
-}
+  /* For surfaces that float above the page and must hide what's underneath */
+  .nx-solid {
+    background: #150b30;
+  }
 
-/* A smaller nested tile */
-.nx-tile {
-  border-radius: 0.625rem;
-  border: 1px solid rgb(150 112 255 / 0.14);
-  background: rgb(255 255 255 / 0.025);
-  transition:
-    border-color 0.2s,
-    background 0.2s,
-    transform 0.2s;
-}
+  /* A smaller nested tile */
+  .nx-tile {
+    border-radius: 0.625rem;
+    border: 1px solid rgb(150 112 255 / 0.14);
+    background: rgb(255 255 255 / 0.025);
+    transition:
+      border-color 0.2s,
+      background 0.2s,
+      transform 0.2s;
+  }
 
-.nx-tile:hover {
-  border-color: var(--color-line-strong);
-  background: rgb(139 92 246 / 0.1);
-}
+  .nx-tile:hover {
+    border-color: var(--color-line-strong);
+    background: rgb(139 92 246 / 0.1);
+  }
 
-/* Buttons */
-.nx-btn {
-  --btn-a: #4a22b6;
-  --btn-b: #2f1279;
-  --btn-line: #7c4dff;
-  --btn-fg: #dccfff;
-  --btn-glow: rgb(124 77 255 / 0.5);
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  overflow: hidden;
-  border-radius: 999px;
-  border: 1px solid var(--btn-line);
-  background: linear-gradient(180deg, var(--btn-a), var(--btn-b));
-  color: var(--btn-fg);
-  font-weight: 500;
-  white-space: nowrap;
-  cursor: pointer;
-  transition:
-    box-shadow 0.2s,
-    transform 0.15s,
-    filter 0.2s;
-}
+  /* Buttons */
+  .nx-btn {
+    --btn-a: #4a22b6;
+    --btn-b: #2f1279;
+    --btn-line: #7c4dff;
+    --btn-fg: #dccfff;
+    --btn-glow: rgb(124 77 255 / 0.5);
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    overflow: hidden;
+    border-radius: 999px;
+    border: 1px solid var(--btn-line);
+    background: linear-gradient(180deg, var(--btn-a), var(--btn-b));
+    color: var(--btn-fg);
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+    transition:
+      box-shadow 0.2s,
+      transform 0.15s,
+      filter 0.2s;
+  }
 
-.nx-btn::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: -60%;
-  width: 40%;
-  transform: skewX(-20deg);
-  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.22), transparent);
-  transition: left 0.6s ease;
-  pointer-events: none;
-}
+  .nx-btn::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -60%;
+    width: 40%;
+    transform: skewX(-20deg);
+    background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.22), transparent);
+    transition: left 0.6s ease;
+    pointer-events: none;
+  }
 
-.nx-btn:hover {
-  box-shadow: 0 0 1.1rem var(--btn-glow);
-  filter: brightness(1.14);
-}
+  .nx-btn:hover {
+    box-shadow: 0 0 1.1rem var(--btn-glow);
+    filter: brightness(1.14);
+  }
 
-.nx-btn:hover::after {
-  left: 120%;
-}
+  .nx-btn:hover::after {
+    left: 120%;
+  }
 
-.nx-btn:active {
-  transform: scale(0.97);
-}
+  .nx-btn:active {
+    transform: scale(0.97);
+  }
 
-.nx-btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-  box-shadow: none;
-}
+  .nx-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
 
-.nx-btn[data-tone="rose"] {
-  --btn-a: #8c1f5c;
-  --btn-b: #5e1140;
-  --btn-line: #d6348f;
-  --btn-fg: #ffc4e4;
-  --btn-glow: rgb(236 75 184 / 0.5);
-}
+  .nx-btn[data-tone="rose"] {
+    --btn-a: #8c1f5c;
+    --btn-b: #5e1140;
+    --btn-line: #d6348f;
+    --btn-fg: #ffc4e4;
+    --btn-glow: rgb(236 75 184 / 0.5);
+  }
 
-.nx-btn[data-tone="blue"] {
-  --btn-a: #1e3a9e;
-  --btn-b: #14236b;
-  --btn-line: #3f63e0;
-  --btn-fg: #c7d6ff;
-  --btn-glow: rgb(79 124 255 / 0.5);
-}
+  .nx-btn[data-tone="blue"] {
+    --btn-a: #1e3a9e;
+    --btn-b: #14236b;
+    --btn-line: #3f63e0;
+    --btn-fg: #c7d6ff;
+    --btn-glow: rgb(79 124 255 / 0.5);
+  }
 
-.nx-btn[data-tone="ghost"] {
-  --btn-a: rgb(255 255 255 / 0.04);
-  --btn-b: rgb(255 255 255 / 0.015);
-  --btn-line: rgb(150 112 255 / 0.32);
-  --btn-fg: var(--color-fg-2);
-}
+  .nx-btn[data-tone="ghost"] {
+    --btn-a: rgb(255 255 255 / 0.04);
+    --btn-b: rgb(255 255 255 / 0.015);
+    --btn-line: rgb(150 112 255 / 0.32);
+    --btn-fg: var(--color-fg-2);
+  }
 
-.nx-btn[data-tone="green"] {
-  --btn-a: #0f6a4d;
-  --btn-b: #0a4633;
-  --btn-line: #22a877;
-  --btn-fg: #c1f7e2;
-  --btn-glow: rgb(52 211 153 / 0.45);
-}
+  .nx-btn[data-tone="green"] {
+    --btn-a: #0f6a4d;
+    --btn-b: #0a4633;
+    --btn-line: #22a877;
+    --btn-fg: #c1f7e2;
+    --btn-glow: rgb(52 211 153 / 0.45);
+  }
 
-/* Brand wordmark */
-.nx-wordmark {
-  background: linear-gradient(95deg, #7fa4ff 0%, #b27bff 45%, #ff5cc0 100%);
-  background-size: 180% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  animation: sheen 7s ease-in-out infinite alternate;
-}
+  /* Brand wordmark */
+  .nx-wordmark {
+    background: linear-gradient(95deg, #7fa4ff 0%, #b27bff 45%, #ff5cc0 100%);
+    background-size: 180% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: sheen 7s ease-in-out infinite alternate;
+  }
 
-/* Form fields */
-.nx-input {
-  width: 100%;
-  border-radius: 0.625rem;
-  border: 1px solid var(--color-line);
-  background: rgb(255 255 255 / 0.035);
-  padding: 0.6rem 0.8rem;
-  font-size: 0.875rem;
-  color: var(--color-fg);
-  transition:
-    border-color 0.2s,
-    box-shadow 0.2s;
-}
+  /* Form fields */
+  .nx-input {
+    width: 100%;
+    border-radius: 0.625rem;
+    border: 1px solid var(--color-line);
+    background: rgb(255 255 255 / 0.035);
+    padding: 0.6rem 0.8rem;
+    font-size: 0.875rem;
+    color: var(--color-fg);
+    transition:
+      border-color 0.2s,
+      box-shadow 0.2s;
+  }
 
-.nx-input::placeholder {
-  color: var(--color-fg-3);
-}
+  .nx-input::placeholder {
+    color: var(--color-fg-3);
+  }
 
-.nx-input:focus {
-  outline: none;
-  border-color: var(--color-nx-lilac);
-  box-shadow: 0 0 0 3px rgb(139 92 246 / 0.22);
-}
+  .nx-input:focus {
+    outline: none;
+    border-color: var(--color-nx-lilac);
+    box-shadow: 0 0 0 3px rgb(139 92 246 / 0.22);
+  }
 
-.nx-input option {
-  background: #1c1138;
+  .nx-input option {
+    background: #1c1138;
+  }
 }
 
 /* Dashboard grid. Proportions come straight from the reference layout. */
@@ -402,7 +405,20 @@ body {
 .mascot-eye {
   transform-box: fill-box;
   transform-origin: center;
-  animation: blink 5.4s infinite;
+  animation: blink 5.4s var(--blink-delay, 0s) infinite;
+}
+
+.mascot-lid {
+  opacity: 0;
+  animation: blink-lid 5.4s var(--blink-delay, 0s) infinite;
+}
+
+/* Fades the galaxy into the page instead of ending in a hard rectangle. */
+.nx-hero-bg {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 14%, #000 80%, transparent), linear-gradient(to right, transparent, #000 10%, #000 86%, transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 14%, #000 80%, transparent), linear-gradient(to right, transparent, #000 10%, #000 86%, transparent);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
 }
 
 .mascot-iris {
@@ -437,7 +453,7 @@ body {
     transform: translateY(0);
   }
   50% {
-    transform: translateY(-0.6rem);
+    transform: translateY(-0.3rem);
   }
 }
 
@@ -523,12 +539,33 @@ body {
 
 @keyframes blink {
   0%,
-  94%,
+  92%,
+  98.5%,
   100% {
     transform: scaleY(1);
+    opacity: 1;
   }
-  97% {
-    transform: scaleY(0.07);
+  94.5% {
+    transform: scaleY(0.2);
+    opacity: 1;
+  }
+  95%,
+  97.5% {
+    transform: scaleY(0.2);
+    opacity: 0;
+  }
+}
+
+@keyframes blink-lid {
+  0%,
+  94.5%,
+  98%,
+  100% {
+    opacity: 0;
+  }
+  95%,
+  97.5% {
+    opacity: 1;
   }
 }
 
