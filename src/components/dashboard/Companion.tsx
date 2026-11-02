@@ -1,15 +1,15 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { Activity, CalendarDays, Ellipsis, Expand, Goal, Mic, Minimize2, SendHorizontal, Star, Trash2 } from "lucide-react";
+import { Activity, CalendarDays, Ellipsis, Expand, Goal, Mic, Minimize2, RotateCcw, SendHorizontal, Square, Star, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Mascot } from "@/components/Mascot";
 import { enter } from "@/components/ui";
-import { companionReply } from "@/lib/companion";
+import { isStaticDemo, retryChat, sendChat, stopChat } from "@/lib/chat-client";
 import { useStore, type ChatMessage } from "@/lib/store";
-import { cn, uid, weekdayIndex } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
 const CHIPS = [
   { label: "What's on my agenda?", icon: CalendarDays, color: "#c4a5ff" },
@@ -24,43 +24,28 @@ const GREETINGS = {
   Playful: (name: string) => `Hey ${name}! 🎉 Your day is sorted, your to-dos are behaving, and I found a few nice surprises.`,
 };
 
-function Bubble({ m, live, onDone }: { m: ChatMessage; live: boolean; onDone: () => void }) {
-  const [shown, setShown] = useState(live ? 0 : m.text.length);
-  const box = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!live) return;
-    const words = m.text.split(/(\s+)/);
-    let i = 0;
-    let length = 0;
-    const t = setInterval(() => {
-      length += words[i]?.length ?? 0;
-      i += 1;
-      setShown(length);
-      box.current?.scrollIntoView({ block: "nearest" });
-      if (i >= words.length) {
-        clearInterval(t);
-        onDone();
-      }
-    }, 34);
-    return () => clearInterval(t);
-  }, [live, m.text, onDone]);
-
+function Bubble({ m }: { m: ChatMessage }) {
   const mine = m.role === "user";
   return (
-    <motion.div ref={box} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className={cn("flex", mine ? "justify-end" : "items-end gap-1.5")}>
+    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className={cn("flex", mine ? "justify-end" : "items-end gap-1.5")}>
       {!mine && <Mascot variant="head" className="w-9 shrink-0" />}
       <div
         className={cn(
           "max-w-[85%] rounded-2xl border px-3.5 py-2.5 text-[0.8125rem] leading-5 whitespace-pre-line",
           mine ? "rounded-br-sm border-nx-violet/60 bg-nx-violet/25 text-white" : "rounded-bl-sm border-line bg-white/4 text-fg",
+          m.failed && "border-nx-rose/50",
         )}
       >
-        {m.text.slice(0, shown)}
-        {m.link && shown >= m.text.length && (
+        {m.text}
+        {m.link && (
           <Link href={m.link.href} className="mt-1.5 block text-xs font-medium text-nx-lilac hover:underline">
             {m.link.label} →
           </Link>
+        )}
+        {m.failed && (
+          <button type="button" onClick={() => retryChat(m.id)} className="mt-1.5 flex cursor-pointer items-center gap-1 text-xs font-medium text-nx-lilac hover:underline">
+            <RotateCcw className="size-3" /> Try again
+          </button>
         )}
       </div>
     </motion.div>
@@ -69,36 +54,31 @@ function Bubble({ m, live, onDone }: { m: ChatMessage; live: boolean; onDone: ()
 
 function ChatBody({ expanded }: { expanded: boolean }) {
   const chat = useStore((s) => s.chat);
-  const pushChat = useStore((s) => s.pushChat);
+  const status = useStore((s) => s.chatStatus);
+  const mode = useStore((s) => s.chatMode);
   const clearChat = useStore((s) => s.clearChat);
   const setUi = useStore((s) => s.setUi);
   const toast = useStore((s) => s.toast);
   const name = useStore((s) => s.profile.name);
   const tone = useStore((s) => s.profile.companionTone);
   const [text, setText] = useState("");
-  const [thinking, setThinking] = useState(false);
-  const [liveId, setLiveId] = useState<string | null>(null);
   const [menu, setMenu] = useState(false);
   const [listening, setListening] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
 
+  const busy = status !== "idle";
+  const demo = isStaticDemo || mode === "demo";
+  const lastLength = chat[chat.length - 1]?.text.length ?? 0;
+
   useEffect(() => {
-    scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: "smooth" });
-  }, [chat.length, thinking]);
+    const box = scroller.current;
+    if (box) box.scrollTop = box.scrollHeight;
+  }, [chat.length, lastLength, status]);
 
   const send = (value: string) => {
-    const input = value.trim();
-    if (!input || thinking) return;
+    if (!value.trim() || busy) return;
     setText("");
-    pushChat({ id: uid(), role: "user", text: input });
-    setThinking(true);
-    setTimeout(() => {
-      const reply = companionReply(input, useStore.getState(), weekdayIndex());
-      const id = uid();
-      setThinking(false);
-      setLiveId(id);
-      pushChat({ id, role: "assistant", ...reply });
-    }, 750);
+    void sendChat(value);
   };
 
   const dictate = () => {
@@ -125,7 +105,9 @@ function ChatBody({ expanded }: { expanded: boolean }) {
           <div className="nx-wordmark text-lg leading-6 font-semibold">
             <i>Nexus</i> OS
           </div>
-          <div className="text-[0.6875rem] text-fg-2">Your AI Companion</div>
+          <div className="text-[0.6875rem] text-fg-2" title={demo ? "Replies come from built-in rules. Connect an OpenAI key for real AI." : undefined}>
+            {demo ? "Demo replies" : "Your AI Companion"}
+          </div>
         </div>
         <div className="relative">
           <button type="button" aria-label="Conversation options" aria-expanded={menu} onClick={() => setMenu(!menu)} className="grid size-8 cursor-pointer place-items-center rounded-md text-fg-2 hover:bg-white/8 hover:text-fg">
@@ -137,6 +119,7 @@ function ChatBody({ expanded }: { expanded: boolean }) {
                 <button
                   type="button"
                   onClick={() => {
+                    stopChat();
                     clearChat();
                     setMenu(false);
                   }}
@@ -170,10 +153,10 @@ function ChatBody({ expanded }: { expanded: boolean }) {
         </motion.div>
 
         {chat.map((m) => (
-          <Bubble key={m.id} m={m} live={m.id === liveId} onDone={() => setLiveId(null)} />
+          <Bubble key={m.id} m={m} />
         ))}
 
-        {thinking && (
+        {status === "thinking" && (
           <div className="flex items-end gap-1.5">
             <Mascot variant="head" className="w-9 shrink-0" />
             <div className="flex gap-1 rounded-2xl rounded-bl-sm border border-line bg-white/4 px-3.5 py-3" aria-label="Nexus is typing">
@@ -184,7 +167,7 @@ function ChatBody({ expanded }: { expanded: boolean }) {
           </div>
         )}
 
-        {chat.length === 0 && !thinking && (
+        {chat.length === 0 && !busy && (
           <ul className="ml-10 space-y-2">
             {CHIPS.map((c, i) => (
               <motion.li key={c.label} initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.7 + i * 0.08 }}>
@@ -210,13 +193,19 @@ function ChatBody({ expanded }: { expanded: boolean }) {
         }}
       >
         <div className="flex h-12 items-center gap-2 rounded-full border border-[#a06bff] bg-[#1a0f38] pr-1.5 pl-4 shadow-[0_0_1rem_rgb(139_92_246_/_0.35)] transition-shadow focus-within:shadow-[0_0_1.4rem_rgb(190_120_255_/_0.6)]">
-          <input aria-label="Ask Nexus anything" value={text} onChange={(e) => setText(e.target.value)} placeholder="Ask anything..." className="min-w-0 flex-1 bg-transparent text-[0.8125rem] outline-none placeholder:text-fg-3" />
+          <input aria-label="Ask Nexus anything" value={text} onChange={(e) => setText(e.target.value)} placeholder="Ask anything..." maxLength={2000} className="min-w-0 flex-1 bg-transparent text-[0.8125rem] outline-none placeholder:text-fg-3" />
           <button type="button" aria-label="Dictate" aria-pressed={listening} onClick={dictate} className={cn("grid size-8 cursor-pointer place-items-center rounded-full hover:bg-white/8", listening ? "animate-pulse text-nx-pink" : "text-fg-2")}>
             <Mic className="size-4.5" />
           </button>
-          <button type="submit" aria-label="Send" disabled={!text.trim() || thinking} className="grid size-9.5 cursor-pointer place-items-center rounded-full bg-gradient-to-br from-[#ff7fd0] to-[#d13ad8] text-white shadow-[0_0_0.8rem_rgb(236_75_184_/_0.6)] transition-transform hover:scale-105 disabled:cursor-default disabled:opacity-70">
-            <SendHorizontal className="size-4.5" />
-          </button>
+          {busy ? (
+            <button type="button" aria-label="Stop reply" onClick={stopChat} className="grid size-9.5 cursor-pointer place-items-center rounded-full border border-nx-pink/60 bg-nx-pink/15 text-[#ff9fdc] transition-colors hover:bg-nx-pink/30">
+              <Square className="size-3.5 fill-current" />
+            </button>
+          ) : (
+            <button type="submit" aria-label="Send" disabled={!text.trim()} className="grid size-9.5 cursor-pointer place-items-center rounded-full bg-gradient-to-br from-[#ff7fd0] to-[#d13ad8] text-white shadow-[0_0_0.8rem_rgb(236_75_184_/_0.6)] transition-transform hover:scale-105 disabled:cursor-default disabled:opacity-70">
+              <SendHorizontal className="size-4.5" />
+            </button>
+          )}
         </div>
       </form>
     </>

@@ -40,6 +40,7 @@ export interface ChatMessage {
   role: "user" | "assistant";
   text: string;
   link?: { label: string; href: string };
+  failed?: boolean;
 }
 
 export interface AgentRun {
@@ -78,6 +79,7 @@ interface Privacy {
 }
 
 const SEED_CHAT: ChatMessage[] = [];
+const MAX_SAVED_MESSAGES = 60;
 
 const seed = () => ({
   priorities: SEED_PRIORITIES,
@@ -110,11 +112,13 @@ export interface Store extends ReturnType<typeof seed> {
   briefOpen: boolean;
   paletteOpen: boolean;
   chatExpanded: boolean;
+  chatStatus: "idle" | "thinking" | "streaming";
+  chatMode: "live" | "demo" | null;
   selectedGoal: string;
 
   toast: (text: string, tone?: Toast["tone"]) => void;
   dismissToast: (id: string) => void;
-  setUi: (patch: Partial<Pick<Store, "launch" | "reviewing" | "briefOpen" | "paletteOpen" | "chatExpanded" | "selectedGoal">>) => void;
+  setUi: (patch: Partial<Pick<Store, "launch" | "reviewing" | "briefOpen" | "paletteOpen" | "chatExpanded" | "chatStatus" | "chatMode" | "selectedGoal">>) => void;
 
   togglePriority: (id: string) => void;
   addPriority: (title: string) => void;
@@ -150,6 +154,9 @@ export interface Store extends ReturnType<typeof seed> {
 
   markNoticesRead: () => void;
   pushChat: (m: ChatMessage) => void;
+  appendChat: (id: string, delta: string) => void;
+  patchChat: (id: string, patch: Partial<ChatMessage>) => void;
+  removeChat: (ids: string[]) => void;
   clearChat: () => void;
 
   togglePermission: (agent: AgentId, p: Permission) => void;
@@ -194,6 +201,8 @@ export const useStore = create<Store>()(
       briefOpen: false,
       paletteOpen: false,
       chatExpanded: false,
+      chatStatus: "idle",
+      chatMode: null,
       selectedGoal: "g1",
 
       toast: (text, tone = "good") => {
@@ -362,7 +371,10 @@ export const useStore = create<Store>()(
         set((s) => ({ workflows: [{ ...w, id: uid(), enabled: true, runs: 0, lastRun: "Never" }, ...s.workflows] })),
 
       markNoticesRead: () => set((s) => ({ notices: s.notices.map((n) => ({ ...n, read: true })) })),
-      pushChat: (m) => set((s) => ({ chat: [...s.chat, m] })),
+      pushChat: (m) => set((s) => ({ chat: [...s.chat, m].slice(-MAX_SAVED_MESSAGES) })),
+      appendChat: (id, delta) => set((s) => ({ chat: s.chat.map((m) => (m.id === id ? { ...m, text: m.text + delta } : m)) })),
+      patchChat: (id, patch) => set((s) => ({ chat: s.chat.map((m) => (m.id === id ? { ...m, ...patch } : m)) })),
+      removeChat: (ids) => set((s) => ({ chat: s.chat.filter((m) => !ids.includes(m.id)) })),
       clearChat: () => set({ chat: [] }),
 
       togglePermission: (agent, p) =>
@@ -385,8 +397,8 @@ export const useStore = create<Store>()(
       name: "nexus-os-v1",
       skipHydration: true,
       partialize: (s) => {
-        const { toasts, launch, reviewing, briefOpen, paletteOpen, chatExpanded, selectedGoal, ...rest } = s;
-        void toasts, launch, reviewing, briefOpen, paletteOpen, chatExpanded, selectedGoal;
+        const { toasts, launch, reviewing, briefOpen, paletteOpen, chatExpanded, chatStatus, chatMode, selectedGoal, ...rest } = s;
+        void toasts, launch, reviewing, briefOpen, paletteOpen, chatExpanded, chatStatus, chatMode, selectedGoal;
         return rest;
       },
     },

@@ -6,7 +6,7 @@ Your personal AI operating system. One intelligent workspace that understands yo
 
 ![NEXUS OS dashboard](docs/screenshots/dashboard.png)
 
-This repository is the complete frontend. It runs on its own with seeded demo data saved in the browser, so every screen and flow works before a backend exists.
+This repository is the complete frontend, plus a real AI chat endpoint. Workspace data is seeded and saved in the browser until the database exists. The GitHub Pages demo has no server, so its chat uses built-in demo replies.
 
 ## Screenshots
 
@@ -42,18 +42,39 @@ Then open http://localhost:3000.
 | Script | Purpose |
 | --- | --- |
 | `npm run dev` | Development server |
-| `npm run build` | Static production build in `out/` |
+| `npm run build` | Production build |
+| `npm start` | Run the production build |
 | `npm run typecheck` | TypeScript check |
+
+## Real AI chat
+
+The companion streams replies from OpenAI, answers from your workspace data, and can add tasks, save memories, schedule events, create goals and launch agents.
+
+1. Copy the template:
+
+   ```bash
+   cp .env.example .env.local
+   ```
+
+2. Add your key to `OPENAI_API_KEY` in `.env.local`, then restart `npm run dev`.
+
+Without a key, the chat falls back to demo replies and says so under its name. `OPENAI_MODEL` selects any Responses API model.
+
+**Privacy:** each message sends a snapshot of the workspace to OpenAI, including tasks, calendar, goals and up to 40 memories. Requests use `store: false`.
+
+**Cost control:** the endpoint checks the request origin, allows 15 requests a minute per IP address, and caps message size and reply length. The rate limit is per server instance, so set a monthly spend limit in your OpenAI account before deploying publicly. There is no login yet, so anyone with the URL can use your key through the chat.
 
 ## Deployment
 
-Every push to `main` runs `.github/workflows/deploy.yml`, which builds the static site and publishes it to GitHub Pages. The site can also be redeployed by hand from the Actions tab.
+**Real AI:** deploy to a Node host such as Vercel and set `OPENAI_API_KEY` in its environment variables. Never commit the key.
+
+**Demo:** every push to `main` runs `.github/workflows/deploy.yml`, which publishes a static build to GitHub Pages. Setting `PAGES_BASE_PATH` selects that build and leaves out the API.
 
 ## Modules
 
 | Route | Module | What works today |
 | --- | --- | --- |
-| `/` | Home | The nine-card dashboard, companion chat and daily insight |
+| `/` | Home | The nine-card dashboard, real AI companion chat and daily insight |
 | `/brain` | AI Brain | Context graph, memory search and filters, pin, add, delete |
 | `/agents` | AI Agents | Ten agents, launch flow, live step-by-step runs |
 | `/planner` | Life Planner | Tasks, week calendar, routines with streaks |
@@ -75,16 +96,17 @@ src/components/charts.tsx  Area, stacked bar and heatmap charts
 src/components/Mascot.tsx  Animated SVG mascot
 src/lib/data.ts        Types and seed data
 src/lib/store.ts       App state, persisted to localStorage
-src/lib/companion.ts   Companion replies
+src/lib/companion.ts   Demo replies used when no model is available
+src/lib/chat-*.ts      Chat client, workspace context and tool definitions
+src/app/api/chat/      Streaming OpenAI endpoint
 ```
 
 ## Connecting the backend
 
-The interface is ready for the stack below. Each piece is simulated in one place, so it can be swapped without touching the screens.
+Chat is already real. The rest of the interface is ready for the stack below, and each remaining piece is simulated in one place, so it can be swapped without touching the screens.
 
 | Replace | With |
 | --- | --- |
-| `companionReply` in `src/lib/companion.ts` | A streaming model endpoint |
 | `draftPlan` in `src/lib/store.ts` | A goal-planning model call |
 | `launchAgent` in `src/lib/store.ts` | The LangGraph execution engine |
 | `runWorkflow` and `toggleApp` in `src/lib/store.ts` | Redis queues and MCP connectors |
