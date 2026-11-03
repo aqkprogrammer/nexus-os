@@ -1,11 +1,12 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { Flame, Plus, Trash2, X } from "lucide-react";
+import { BellRing, Flame, Plus, Repeat as RepeatIcon, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Legend } from "@/components/charts";
 import { Bar, Btn, Card, Check3, Modal, Page } from "@/components/ui";
-import { AREA_COLORS, AREAS, DAYS, type CalEvent, type LifeArea } from "@/lib/data";
+import { AREA_COLORS, AREAS, DAYS, REPEAT_LABELS, type CalEvent, type LifeArea, type Repeat } from "@/lib/data";
+import { REMINDER_OPTIONS, reminderLabel } from "@/lib/reminders";
 import { useStore } from "@/lib/store";
 import { cn, weekdayIndex } from "@/lib/utils";
 
@@ -33,8 +34,11 @@ interface Drag {
 const snap = (hours: number) => Math.round(hours * 2) / 2;
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
 
+const NO_EVENTS: CalEvent[] = [];
+
 function WeekGrid({ onSlot, onOpen }: { onSlot: (day: number, hour: number) => void; onOpen: (e: CalEvent) => void }) {
   const events = useStore((s) => s.events);
+  const google = useStore((s) => s.google?.events ?? NO_EVENTS);
   const moveEvent = useStore((s) => s.moveEvent);
   const [now, setNow] = useState<Date | null>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
@@ -169,6 +173,25 @@ function WeekGrid({ onSlot, onOpen }: { onSlot: (day: number, hour: number) => v
                   </motion.button>
                 );
               })}
+              {google.map((event) => (
+                <button
+                  key={event.id}
+                  type="button"
+                  data-event={event.title}
+                  aria-label={`${event.title}, ${DAYS[event.day]} at ${fmt(event.start)}, from Google Calendar`}
+                  onClick={() => onOpen(event)}
+                  className="pointer-events-auto absolute flex flex-col overflow-hidden rounded-md border border-dashed border-[#60a5fa] bg-[#60a5fa]/15 px-1.5 py-0.5 text-left text-[0.6875rem] leading-tight text-fg hover:brightness-125"
+                  style={{
+                    left: `calc(${(event.day / DAYS.length) * 100}% + 0.125rem)`,
+                    width: `calc(${100 / DAYS.length}% - 0.25rem)`,
+                    top: `${(Math.max(FIRST_HOUR, event.start) - FIRST_HOUR) * HOUR_REM}rem`,
+                    height: `${Math.max(0.25, Math.min(event.duration, LAST_HOUR - Math.max(FIRST_HOUR, event.start))) * HOUR_REM - 0.1}rem`,
+                  }}
+                >
+                  <span className="block truncate font-medium">{event.title}</span>
+                  <span className="block truncate text-fg-2">Google</span>
+                </button>
+              ))}
               {today >= 0 && nowHour >= FIRST_HOUR && nowHour <= LAST_HOUR && (
                 <span
                   className="absolute z-10 h-0.5 bg-nx-pink shadow-[0_0_0.5rem_#ec4bb8]"
@@ -185,10 +208,15 @@ function WeekGrid({ onSlot, onOpen }: { onSlot: (day: number, hour: number) => v
   );
 }
 
+const REPEATS: (Repeat | undefined)[] = [undefined, "daily", "weekdays", "weekly"];
+const nextRepeat = (r?: Repeat) => REPEATS[(REPEATS.indexOf(r) + 1) % REPEATS.length];
+
 export default function PlannerPage() {
   const priorities = useStore((s) => s.priorities);
   const togglePriority = useStore((s) => s.togglePriority);
   const addPriority = useStore((s) => s.addPriority);
+  const setRepeat = useStore((s) => s.setRepeat);
+  const setReminder = useStore((s) => s.setReminder);
   const removePriority = useStore((s) => s.removePriority);
   const habits = useStore((s) => s.habits);
   const toggleHabit = useStore((s) => s.toggleHabit);
@@ -198,9 +226,10 @@ export default function PlannerPage() {
   const toast = useStore((s) => s.toast);
 
   const [task, setTask] = useState("");
+  const [repeat, setRepeatChoice] = useState<Repeat | "">("");
   const [routine, setRoutine] = useState("");
   const [slot, setSlot] = useState<{ day: number; start: number } | null>(null);
-  const [draft, setDraft] = useState({ title: "", duration: 1, area: "Work" as LifeArea });
+  const [draft, setDraft] = useState({ title: "", duration: 1, area: "Work" as LifeArea, remind: 10 });
   const [opened, setOpened] = useState<CalEvent | null>(null);
   const [today, setToday] = useState(-1);
   useEffect(() => setToday(weekdayIndex()), []);
@@ -228,6 +257,16 @@ export default function PlannerPage() {
                   <motion.li key={p.id} layout initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="group flex items-center gap-2.5 rounded-lg px-1 py-1.5 hover:bg-white/4">
                     <Check3 on={p.done} onChange={() => togglePriority(p.id)} label={p.title} />
                     <span className={cn("min-w-0 flex-1 truncate text-sm", p.done ? "text-fg-3 line-through" : "text-fg")}>{p.title}</span>
+                    <button
+                      type="button"
+                      aria-label={`${p.title} repeats: ${p.repeat ? REPEAT_LABELS[p.repeat] : "Never"}. Change`}
+                      title="Change how often it repeats"
+                      onClick={() => setRepeat(p.id, nextRepeat(p.repeat))}
+                      className={cn("flex shrink-0 cursor-pointer items-center gap-1 rounded-md px-1.5 py-0.5 text-[0.6875rem] hover:bg-white/8", p.repeat ? "text-nx-lilac" : "text-fg-3 opacity-0 group-hover:opacity-100 focus:opacity-100")}
+                    >
+                      <RepeatIcon className="size-3.5" />
+                      {p.repeat && REPEAT_LABELS[p.repeat]}
+                    </button>
                     <button type="button" aria-label={`Remove ${p.title}`} onClick={() => removePriority(p.id)} className="cursor-pointer text-fg-3 opacity-0 transition-opacity group-hover:opacity-100 hover:text-nx-rose focus:opacity-100">
                       <X className="size-4" />
                     </button>
@@ -240,11 +279,20 @@ export default function PlannerPage() {
               onSubmit={(e) => {
                 e.preventDefault();
                 if (!task.trim()) return;
-                addPriority(task.trim());
+                addPriority(task.trim(), repeat || undefined);
                 setTask("");
+                setRepeatChoice("");
               }}
             >
-              <input aria-label="New task" value={task} onChange={(e) => setTask(e.target.value)} placeholder="Add a task" className="nx-input" />
+              <input aria-label="New task" value={task} onChange={(e) => setTask(e.target.value)} placeholder="Add a task" className="nx-input min-w-0" />
+              <select aria-label="Repeat" value={repeat} onChange={(e) => setRepeatChoice(e.target.value as Repeat | "")} className="nx-input !w-[7.5rem] shrink-0">
+                <option value="">Once</option>
+                {(Object.keys(REPEAT_LABELS) as Repeat[]).map((r) => (
+                  <option key={r} value={r}>
+                    {REPEAT_LABELS[r]}
+                  </option>
+                ))}
+              </select>
               <Btn type="submit" aria-label="Add task" className="!px-3" disabled={!task.trim()}>
                 <Plus className="size-4" />
               </Btn>
@@ -313,8 +361,8 @@ export default function PlannerPage() {
           onSubmit={(e) => {
             e.preventDefault();
             if (!slot || !draft.title.trim()) return;
-            addEvent({ ...slot, ...draft, title: draft.title.trim() });
-            setDraft({ title: "", duration: 1, area: "Work" });
+            addEvent({ ...slot, ...draft, title: draft.title.trim(), remind: draft.remind || undefined });
+            setDraft({ title: "", duration: 1, area: "Work", remind: 10 });
             setSlot(null);
             toast("Added to your week");
           }}
@@ -367,6 +415,16 @@ export default function PlannerPage() {
               </select>
             </label>
           </div>
+          <label className="block text-xs text-fg-2">
+            Reminder
+            <select value={draft.remind} onChange={(e) => setDraft({ ...draft, remind: Number(e.target.value) })} className="nx-input mt-1.5">
+              {REMINDER_OPTIONS.map((m) => (
+                <option key={m} value={m}>
+                  {reminderLabel(m)}
+                </option>
+              ))}
+            </select>
+          </label>
           <div className="flex justify-end">
             <Btn type="submit" disabled={!draft.title.trim()}>
               Add event
@@ -376,7 +434,29 @@ export default function PlannerPage() {
       </Modal>
 
       <Modal open={!!opened} onClose={() => setOpened(null)} title={opened?.title} subtitle={opened ? `${DAYS[opened.day]}, ${fmt(opened.start)} to ${fmt(opened.start + opened.duration)} · ${opened.area}` : undefined}>
-        <div className="mt-5 flex justify-end">
+        {opened?.external && <p className="mt-4 text-sm text-fg-2">From your Google Calendar. Change it there, and it updates here.</p>}
+        {opened && !opened.external && (
+          <label className="mt-4 flex items-center gap-2 text-sm text-fg-2">
+            <BellRing className="size-4" />
+            <select
+              aria-label="Reminder"
+              value={opened.remind ?? 0}
+              onChange={(e) => {
+                const minutes = Number(e.target.value) || undefined;
+                setReminder(opened.id, minutes);
+                setOpened({ ...opened, remind: minutes });
+              }}
+              className="nx-input !w-auto"
+            >
+              {REMINDER_OPTIONS.map((m) => (
+                <option key={m} value={m}>
+                  {reminderLabel(m)}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        <div className={cn("mt-5 flex justify-end", opened?.external && "hidden")}>
           <Btn
             tone="rose"
             onClick={() => {

@@ -2,6 +2,9 @@ import OpenAI from "openai";
 import type { ResponseInputItem } from "openai/resources/responses/responses";
 import { currentUser } from "@/lib/auth";
 import { CHAT_TOOLS, parseToolCall, type ChatEvent } from "@/lib/chat-tools";
+import { AI_LIMIT_REACHED, spendAi } from "@/lib/billing";
+import { searchMemories } from "@/lib/memory-search";
+import { rateLimited } from "@/lib/rate-limit";
 import { sameOrigin } from "@/lib/request";
 
 const MODEL = process.env.OPENAI_MODEL || "gpt-6-astra";
@@ -11,22 +14,6 @@ const MAX_CONTEXT_CHARS = 30000;
 const MAX_OUTPUT_TOKENS = 700;
 const MAX_MODEL_TURNS = 4;
 const RATE_LIMIT = 15;
-const RATE_WINDOW_MS = 60_000;
-
-/** Per-instance, so it slows abuse rather than guaranteeing a limit. Set a spend cap at OpenAI too. */
-const recent = new Map<string, number[]>();
-
-function rateLimited(userId: string) {
-  const now = Date.now();
-  const hits = (recent.get(userId) ?? []).filter((t) => now - t < RATE_WINDOW_MS);
-  if (hits.length >= RATE_LIMIT) {
-    recent.set(userId, hits);
-    return true;
-  }
-  recent.set(userId, [...hits, now]);
-  if (recent.size > 5000) recent.clear();
-  return false;
-}
 
 interface ChatRequest {
   messages: { role: "user" | "assistant"; text: string }[];
@@ -83,10 +70,16 @@ export async function POST(req: Request) {
   if (!user) return Response.json({ error: "unauthorized" }, { status: 401 });
 
   if (!process.env.OPENAI_API_KEY) return Response.json({ error: "not_configured" }, { status: 503 });
-  if (rateLimited(user.id)) return Response.json({ error: "rate_limited" }, { status: 429 });
+  if (rateLimited(`chat:${user.id}`, RATE_LIMIT)) return Response.json({ error: "rate_limited" }, { status: 429 });
+  if (!(await spendAi(user.id))) return Response.json({ error: AI_LIMIT_REACHED }, { status: 402 });
 
   const body = parseBody(await req.json().catch(() => null));
   if (!body) return Response.json({ error: "invalid_request" }, { status: 400 });
+
+  // The client sends recent memories. Search adds older ones that match the question, when it's available.
+  const question = body.messages[body.messages.length - 1].text;
+  const related = await searchMemories(user.id, question, 6).catch(() => []);
+  if (related.length) Object.assign(body.context, { relatedMemories: related.map((r) => r.text) });
 
   const client = new OpenAI();
   const encoder = new TextEncoder();

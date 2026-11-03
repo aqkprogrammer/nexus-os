@@ -2,7 +2,7 @@ import { buildContext } from "./chat-context";
 import type { ChatEvent, ChatToolCall } from "./chat-tools";
 import { companionReply } from "./companion";
 import { useStore, type ChatMessage } from "./store";
-import { isStaticDemo, uid, weekdayIndex } from "./utils";
+import { AI_LIMIT_MESSAGE, isStaticDemo, uid, weekdayIndex } from "./utils";
 
 const MAX_HISTORY = 20;
 const MAX_INPUT_CHARS = 2000;
@@ -49,6 +49,7 @@ async function streamLive(signal: AbortSignal, onText: (delta: string) => void, 
 
   if (res.status === 503 || res.status === 404) return false;
   if (res.status === 401) throw new ChatError("You've been signed out. Sign in again to keep chatting.");
+  if (res.status === 402) throw new ChatError(AI_LIMIT_MESSAGE);
   if (res.status === 429) throw new ChatError("You're sending messages quickly. Give me a moment and try again.");
   if (!res.ok || !res.body) throw new ChatError("I couldn't reach the AI service.");
 

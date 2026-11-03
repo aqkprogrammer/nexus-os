@@ -1,6 +1,8 @@
 /** The GitHub Pages build has no server, so it uses demo replies and browser storage, with no accounts. */
 export const isStaticDemo = process.env.NEXT_PUBLIC_STATIC_DEMO === "1";
 
+export const AI_LIMIT_MESSAGE = "You've used today's AI allowance on the Free plan. Upgrade to Pro in Settings for more.";
+
 export function cn(...parts: (string | false | null | undefined)[]) {
   return parts.filter(Boolean).join(" ");
 }
@@ -8,6 +10,18 @@ export function cn(...parts: (string | false | null | undefined)[]) {
 export function uid() {
   return Math.random().toString(36).slice(2, 9);
 }
+
+/** When a memory was saved, as "8:15 AM" for today or a day label otherwise. */
+export function memoryWhen(m: { daysAgo: number; time?: string; at?: number }, now = new Date()) {
+  if (m.at === undefined) return m.daysAgo === 0 ? m.time : dayLabel(m.daysAgo);
+  const saved = new Date(m.at);
+  const midnight = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const days = Math.round((midnight(now) - midnight(saved)) / 86_400_000);
+  return days === 0 ? saved.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : dayLabel(days);
+}
+
+/** How long ago a memory was saved, in whole days. */
+export const memoryAge = (m: { daysAgo: number; at?: number }) => (m.at === undefined ? m.daysAgo : Math.floor((Date.now() - m.at) / 86_400_000));
 
 /** A seeded `{ daysAgo }` stamp stays recent no matter when the app is opened. */
 export function dayLabel(daysAgo: number) {

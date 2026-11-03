@@ -46,6 +46,18 @@ export const nav = (page: Page, label: string) => page.getByRole("navigation", {
 
 export const chat = (page: Page) => page.locator("#tour-companion");
 
+/** Creates an account through the sign-up form, which lands on an empty dashboard with the tour open. */
+export async function createAccount(page: Page, email: string, name: string) {
+  await page.goto("/login");
+  await page.getByRole("tab", { name: "Create account" }).click();
+  await page.getByLabel("Name").fill(name);
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Password").fill(PASSWORD);
+  await page.getByRole("button", { name: "Create account" }).last().click();
+}
+
+export const skipTour = (page: Page) => page.getByRole("button", { name: "Skip" }).click();
+
 export async function ask(page: Page, text: string) {
   await page.getByLabel("Ask Nexus anything").fill(text);
   await page.getByLabel("Ask Nexus anything").press("Enter");

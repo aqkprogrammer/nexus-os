@@ -1,6 +1,6 @@
 import { expect, test } from "./helpers";
 
-for (const route of ["/", "/brain", "/agents", "/planner", "/analytics", "/automations", "/goals", "/actions", "/privacy", "/settings"]) {
+for (const route of ["/", "/brain", "/agents", "/planner", "/analytics", "/automations", "/goals", "/actions", "/privacy", "/settings", "/spaces"]) {
   test(`${route} has no sideways scrolling on a phone`, async ({ page }) => {
     await page.goto(route);
     await expect(page.locator("main")).toBeVisible();

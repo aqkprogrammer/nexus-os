@@ -6,10 +6,10 @@ import { useCallback, useMemo, useState } from "react";
 import { AreaChart, Heatmap, Legend, StackedBars } from "@/components/charts";
 import { Card, CountUp, Page, Segmented, Stat } from "@/components/ui";
 import { ANALYTICS_INSIGHTS, AREA_COLORS, AREAS, DAYS, RANGES, type RangeKey } from "@/lib/data";
-import { hoursByDay, useLiveStats } from "@/lib/stats";
+import { checkinWeeks, hoursByDay, rangeLabel, useLiveStats } from "@/lib/stats";
 import { useStore } from "@/lib/store";
 
-const OPTIONS = (Object.keys(RANGES) as RangeKey[]).map((value) => ({ value, label: RANGES[value].label }));
+const RANGE_KEYS = Object.keys(RANGES) as RangeKey[];
 const hours = (v: number) => `${v.toFixed(1)} hrs`;
 const whole = (v: number) => Math.round(v).toLocaleString("en-US");
 const percent = (v: number) => `${Math.round(v)}%`;
@@ -22,13 +22,13 @@ const HEAT_WEEKS = Array.from({ length: 16 }, (_, w) =>
   }),
 );
 
-const EMPTY_WEEKS = HEAT_WEEKS.map((week) => week.map(() => 0));
-
 export default function AnalyticsPage() {
   const [range, setRange] = useState<RangeKey>("week");
   const [view, setView] = useState<"chart" | "table">("chart");
   const d = useLiveStats(range);
   const sample = useStore((s) => s.sample);
+  const timeline = useStore((s) => s.timeline);
+  const options = RANGE_KEYS.map((value) => ({ value, label: rangeLabel(value, sample) }));
   const habits = useStore((s) => s.habits);
   const goals = useStore((s) => s.goals);
   const events = useStore((s) => s.events);
@@ -42,16 +42,16 @@ export default function AnalyticsPage() {
   const thisWeek = DAYS.map((_, day) => Math.min(4, habits.filter((h) => h.week[day]).length));
 
   return (
-    <Page title="Life Analytics" subtitle="Progress, productivity and insights." actions={sample && <Segmented id="range" value={range} options={OPTIONS} onChange={setRange} />}>
+    <Page title="Life Analytics" subtitle="Progress, productivity and insights." actions={<Segmented id="range" value={range} options={options} onChange={setRange} />}>
       <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="Focus time" value={<CountUp to={d.focus} format={hours} />} note={d.focusDelta === null ? "Scheduled this week" : `${d.focusDelta >= 0 ? "Up" : "Down"} ${Math.abs(d.focusDelta)}% vs ${d.compare}`} />
+        <Stat label="Focus time" value={<CountUp to={d.focus} format={hours} />} note={d.focusDelta === null ? "No earlier period to compare yet" : `${d.focusDelta >= 0 ? "Up" : "Down"} ${Math.abs(d.focusDelta)}% vs ${d.compare}`} />
         <Stat label="Tasks done" value={<CountUp to={d.tasks} format={whole} />} note={d.tasksNote} delay={0.05} />
         <Stat label="Time saved by agents" value={d.saved} note="Automations and agent runs" delay={0.1} />
         <Stat label="Plan completion" value={<CountUp to={d.completion} format={percent} />} note={`Across ${goals.length} active goals`} delay={0.15} />
       </div>
 
       <div className="grid gap-3 xl:grid-cols-5">
-        <Card title="Focus Trend" subtitle={sample ? `Hours of deep work, ${d.label.toLowerCase()}` : "Hours of work and learning scheduled each day"} delay={0.1} className="!overflow-visible xl:col-span-3">
+        <Card title="Focus Trend" subtitle={sample ? `Hours of deep work, ${d.label.toLowerCase()}` : range === "week" ? "Hours of work and learning scheduled each day" : "Hours of work and learning scheduled each week"} delay={0.1} className="!overflow-visible xl:col-span-3">
           <AreaChart key={range} data={d.series} labels={d.labels} format={tip} label={`Focus trend ${d.label}`} axis className="mt-2 h-60" color="#b57bff" />
         </Card>
 
@@ -133,8 +133,8 @@ export default function AnalyticsPage() {
         </Card>
 
         <Card title="Routine Consistency" subtitle={`${logged} check-ins logged this week`} delay={0.24} className="xl:col-span-3">
-          {/* The earlier weeks are invented, so a real account shows them empty. */}
-          <Heatmap weeks={[...(sample ? HEAT_WEEKS : EMPTY_WEEKS).slice(0, -1), thisWeek]} />
+          {/* The sample's earlier weeks are invented. A real account's come from its check-in history. */}
+          <Heatmap weeks={sample ? [...HEAT_WEEKS.slice(0, -1), thisWeek] : checkinWeeks(timeline, HEAT_WEEKS.length)} />
         </Card>
 
         <Card title="What Nexus Noticed" delay={0.28} className="xl:col-span-5" bodyClass="!pt-1">

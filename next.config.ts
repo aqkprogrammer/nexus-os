@@ -8,7 +8,7 @@ const pagesBasePath = process.env.PAGES_BASE_PATH;
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   turbopack: { root: path.resolve(__dirname) },
-  env: { NEXT_PUBLIC_STATIC_DEMO: pagesBasePath ? "1" : "" },
+  env: { NEXT_PUBLIC_STATIC_DEMO: pagesBasePath ? "1" : "", NEXT_PUBLIC_BASE_PATH: pagesBasePath ?? "" },
   ...(pagesBasePath && {
     output: "export",
     trailingSlash: true,

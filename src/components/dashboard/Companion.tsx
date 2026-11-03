@@ -9,6 +9,7 @@ import { Mascot } from "@/components/Mascot";
 import { enter } from "@/components/ui";
 import { retryChat, sendChat, stopChat } from "@/lib/chat-client";
 import { useStore, type ChatMessage } from "@/lib/store";
+import { useDictation } from "@/lib/voice";
 import { cn, isStaticDemo } from "@/lib/utils";
 
 const CHIPS = [
@@ -65,13 +66,12 @@ function ChatBody({ expanded }: { expanded: boolean }) {
   const mode = useStore((s) => s.chatMode);
   const clearChat = useStore((s) => s.clearChat);
   const setUi = useStore((s) => s.setUi);
-  const toast = useStore((s) => s.toast);
   const name = useStore((s) => s.profile.name);
   const tone = useStore((s) => s.profile.companionTone);
   const sample = useStore((s) => s.sample);
   const [text, setText] = useState("");
   const [menu, setMenu] = useState(false);
-  const [listening, setListening] = useState(false);
+  const { listening, dictate } = useDictation(setText);
   const scroller = useRef<HTMLDivElement>(null);
 
   const busy = status !== "idle";
@@ -89,21 +89,6 @@ function ChatBody({ expanded }: { expanded: boolean }) {
     void sendChat(value);
   };
 
-  const dictate = () => {
-    type SR = { lang: string; onresult: (e: { results: { 0: { 0: { transcript: string } } } }) => void; onend: () => void; start: () => void };
-    const w = window as unknown as { SpeechRecognition?: new () => SR; webkitSpeechRecognition?: new () => SR };
-    const Ctor = w.SpeechRecognition ?? w.webkitSpeechRecognition;
-    if (!Ctor) {
-      toast("Voice input isn't supported in this browser", "warn");
-      return;
-    }
-    const sr = new Ctor();
-    sr.lang = "en-US";
-    sr.onresult = (e) => setText(e.results[0][0].transcript);
-    sr.onend = () => setListening(false);
-    setListening(true);
-    sr.start();
-  };
 
   return (
     <>

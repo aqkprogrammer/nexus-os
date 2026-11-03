@@ -9,7 +9,7 @@ import { AreaChart } from "@/components/charts";
 import { Mascot } from "@/components/Mascot";
 import { Btn, Card, Check3, CountUp, Ring } from "@/components/ui";
 import { ACTION_ICONS, goalProgress, RANGES, type RangeKey } from "@/lib/data";
-import { useLiveStats } from "@/lib/stats";
+import { rangeLabel, useLiveStats } from "@/lib/stats";
 import { useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
@@ -94,6 +94,7 @@ export function ActionCenter() {
 
 function RangeSelect({ value, onChange }: { value: RangeKey; onChange: (r: RangeKey) => void }) {
   const [open, setOpen] = useState(false);
+  const sample = useStore((s) => s.sample);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
@@ -110,7 +111,7 @@ function RangeSelect({ value, onChange }: { value: RangeKey; onChange: (r: Range
         onClick={() => setOpen(!open)}
         className="flex h-6.5 cursor-pointer items-center gap-1.5 rounded-md border border-line bg-white/4 px-2 text-[0.6875rem] text-fg-2 hover:text-fg"
       >
-        {RANGES[value].label}
+        {rangeLabel(value, sample)}
         <ChevronDown className={cn("size-3 transition-transform", open && "rotate-180")} />
       </button>
       <AnimatePresence>
@@ -131,7 +132,7 @@ function RangeSelect({ value, onChange }: { value: RangeKey; onChange: (r: Range
                   }}
                   className={cn("w-full cursor-pointer rounded px-2 py-1 text-left text-[0.6875rem] hover:bg-white/8", r === value ? "text-white" : "text-fg-2")}
                 >
-                  {RANGES[r].label}
+                  {rangeLabel(r, sample)}
                 </button>
               </li>
             ))}
@@ -147,19 +148,18 @@ const count = (v: number) => Math.round(v).toLocaleString("en-US");
 
 export function AnalyticsOverview() {
   const [range, setRange] = useState<RangeKey>("week");
-  const sample = useStore((s) => s.sample);
   const d = useLiveStats(range);
   const up = (d.focusDelta ?? 0) >= 0;
   const tip = useCallback((v: number) => `${v.toFixed(1)} hrs`, []);
 
   return (
-    <Card n={3} tone="blue" title="Life Analytics" right={sample ? <RangeSelect value={range} onChange={setRange} /> : <span className="text-[0.6875rem] text-fg-3">{d.label}</span>} delay={0.2} className="!overflow-visible">
+    <Card n={3} tone="blue" title="Life Analytics" right={<RangeSelect value={range} onChange={setRange} />} delay={0.2} className="!overflow-visible">
       <p className="text-[0.6875rem] text-fg-2">Focus Time</p>
       <div className="text-xl leading-6 font-semibold">
         <CountUp to={d.focus} format={hrs} />
       </div>
       {d.focusDelta === null ? (
-        <p className="text-[0.6875rem] text-fg-3">Scheduled on your calendar</p>
+        <p className="text-[0.6875rem] text-fg-3">No earlier period to compare yet</p>
       ) : (
         <p className="flex items-center gap-1 text-[0.6875rem] text-fg-3">
           {up ? <ArrowUp className="size-3 text-nx-green" /> : <ArrowDown className="size-3 text-nx-rose" />}

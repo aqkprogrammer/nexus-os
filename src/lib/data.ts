@@ -30,6 +30,7 @@ import {
   CircleCheckBig,
   ShieldHalf,
   type LucideIcon,
+  UsersRound,
 } from "lucide-react";
 
 /* Navigation */
@@ -74,6 +75,7 @@ export const NAV: NavItem[] = [
     ],
   },
   { href: "/goals", label: "Goal Intelligence", icon: Target },
+  { href: "/spaces", label: "Shared Spaces", icon: UsersRound },
   { href: "/actions", label: "Actions", icon: CircleCheckBig },
   { href: "/privacy", label: "Privacy", icon: ShieldHalf },
   { href: "/settings", label: "Settings", icon: Settings },
@@ -207,10 +209,20 @@ export const RUN_STEPS = [
 
 /* Priorities */
 
+export type Repeat = "daily" | "weekdays" | "weekly";
+
+export const REPEAT_LABELS: Record<Repeat, string> = { daily: "Every day", weekdays: "Weekdays", weekly: "Every week" };
+
 export interface Priority {
   id: string;
   title: string;
   done: boolean;
+  /** Reopens on this schedule after it's done. */
+  repeat?: Repeat;
+  /** YYYY-MM-DD. Unfinished tasks from an earlier day move to today. The sample's tasks have none. */
+  due?: string;
+  /** YYYY-MM-DD it was last finished. */
+  doneOn?: string;
 }
 
 export const SEED_PRIORITIES: Priority[] = [
@@ -233,6 +245,8 @@ export interface ActionItem {
   agent: AgentId;
   summary: string;
   impact: string;
+  /** The work an agent actually produced, when AI is on. */
+  result?: string;
 }
 
 export const ACTION_ICONS: Record<ActionIcon, LucideIcon> = {
@@ -346,10 +360,14 @@ export interface Memory {
   detail: string;
   type: MemoryType;
   area: MemoryArea;
-  /** Days before today, plus an optional clock time for today's entries */
+  /** The sample's stamp: days before today, plus a clock time for today's entries. It never ages. */
   daysAgo: number;
   time?: string;
+  /** When a real memory was saved. Takes over from daysAgo, so the date ages properly. */
+  at?: number;
   pinned?: boolean;
+  /** An uploaded file this memory was made from. */
+  fileId?: string;
 }
 
 export const MEMORY_ICONS: Record<MemoryType, { icon: LucideIcon; color: string; label: string }> = {
@@ -468,6 +486,10 @@ export interface CalEvent {
   start: number;
   duration: number;
   area: LifeArea;
+  /** Minutes before the start to send a reminder. */
+  remind?: number;
+  /** Read from Google Calendar. Shown but never saved or edited here. */
+  external?: "google";
 }
 
 export const SEED_EVENTS: CalEvent[] = [
@@ -504,6 +526,8 @@ export interface Habit {
   streak: number;
   /** Monday first */
   week: boolean[];
+  /** The Monday `week` belongs to. The sample leaves it out, so its week never resets. */
+  weekOf?: string;
 }
 
 export const SEED_HABITS: Habit[] = [

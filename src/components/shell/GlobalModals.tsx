@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Clock, Rocket, Sparkles, X } from "lucide-react";
+import { Check, Clock, Copy, Rocket, Sparkles, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Mascot } from "@/components/Mascot";
@@ -100,6 +100,23 @@ function ReviewModal() {
             {(item.value ?? item.priority) && <span className="ml-auto text-sm font-semibold whitespace-nowrap">{item.value ?? item.priority}</span>}
           </div>
           <p className="mt-4 text-sm leading-6 text-fg-2">{item.summary}</p>
+          {item.result && (
+            <div className="relative mt-3">
+              <pre aria-label="Agent result" className="nx-tile max-h-72 overflow-y-auto px-3 py-2.5 pr-16 font-sans text-[0.8125rem] leading-6 whitespace-pre-wrap text-fg">
+                {item.result}
+              </pre>
+              <button
+                type="button"
+                onClick={() => {
+                  void navigator.clipboard?.writeText(item.result ?? "");
+                  useStore.getState().toast("Copied");
+                }}
+                className="absolute top-2 right-2 inline-flex cursor-pointer items-center gap-1 rounded-md border border-line bg-[#1c1138] px-2 py-1 text-xs text-fg-2 hover:text-fg"
+              >
+                <Copy className="size-3.5" /> Copy
+              </button>
+            </div>
+          )}
           <div className="nx-tile mt-3 flex items-center gap-2 px-3 py-2 text-[0.8125rem] text-fg">
             <Sparkles className="size-4 text-nx-amber" /> {item.impact}
           </div>
@@ -127,6 +144,7 @@ function BriefModal() {
   const actions = useStore((s) => s.actions);
   const goals = useStore((s) => s.goals);
   const name = useStore((s) => s.profile.name);
+  const mail = useStore((s) => s.google?.mail);
   const close = () => setUi({ briefOpen: false });
   const openItems = priorities.filter((p) => !p.done);
   const week = useLiveStats();
@@ -151,6 +169,19 @@ function BriefModal() {
         ))}
         {openItems.length === 0 && <li className="nx-tile px-3 py-2 text-fg-2">All priorities are done.</li>}
       </ul>
+      {mail && mail.length > 0 && (
+        <>
+          <h3 className="mt-4 text-xs font-semibold tracking-wide text-fg-3 uppercase">Unread email</h3>
+          <ul className="mt-1.5 space-y-1.5 text-sm">
+            {mail.slice(0, 4).map((m) => (
+              <li key={m.id} className="nx-tile px-3 py-2">
+                <span className="block truncate text-fg">{m.subject}</span>
+                <span className="block truncate text-xs text-fg-3">{m.from}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
       {goals[0] && (
         <>
           <h3 className="mt-4 text-xs font-semibold tracking-wide text-fg-3 uppercase">Watch out for</h3>

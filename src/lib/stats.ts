@@ -19,6 +19,7 @@ import {
   type RangeKey,
   type Workflow,
 } from "./data";
+import { dayKey, emptyHistory, shiftDays, startOfWeek, type ActivityKind, type History } from "./activity";
 import { useStore, type AgentRun } from "./store";
 
 /** Minutes of work each kind of automated help is assumed to save. */
@@ -34,7 +35,18 @@ export interface Activity {
   runs: AgentRun[];
   /** True when the workspace holds the sample data, which comes with months of invented history. */
   sample: boolean;
+  /** A real account's dated activity. */
+  timeline?: History;
 }
+
+/** A real account's ranges are whole calendar weeks, so they line up with the weekly focus record. */
+const OWN_RANGES: Record<RangeKey, { weeks: number; label: string; compare: string; note: string }> = {
+  week: { weeks: 1, label: "This Week", compare: "last week", note: "this week" },
+  month: { weeks: 4, label: "Last 4 Weeks", compare: "the 4 weeks before", note: "in 4 weeks" },
+  quarter: { weeks: 13, label: "Last 13 Weeks", compare: "the 13 weeks before", note: "in 13 weeks" },
+};
+
+export const rangeLabel = (range: RangeKey, sample: boolean) => (sample ? RANGES : OWN_RANGES)[range].label;
 
 export interface Stats {
   label: string;
@@ -51,11 +63,14 @@ export interface Stats {
   labels: string[];
 }
 
-const focusHours = (events: CalEvent[]) => events.filter((e) => FOCUS_AREAS.includes(e.area)).reduce((sum, e) => sum + e.duration, 0);
+export const focusHours = (events: CalEvent[]) => events.filter((e) => FOCUS_AREAS.includes(e.area)).reduce((sum, e) => sum + e.duration, 0);
 const approved = (history: ActionRecord[]) => history.filter((h) => h.outcome === "approved").length;
 const milestonesDone = (goals: Goal[]) => goals.reduce((sum, g) => sum + g.milestones.filter((m) => m.done).length, 0);
 const workflowRuns = (workflows: Workflow[]) => workflows.reduce((sum, w) => sum + w.runs, 0);
 const agentRuns = (runs: AgentRun[]) => runs.filter((r) => r.status === "done").length;
+const sum = (values: number[]) => values.reduce((total, v) => total + v, 0);
+const DONE_KINDS: ActivityKind[] = ["task", "milestone", "approved"];
+const SAVED_BY_KIND: Partial<Record<ActivityKind, number>> = { approved: MINUTES_SAVED.approval, agent: MINUTES_SAVED.agentRun, workflow: MINUTES_SAVED.workflowRun };
 const completion = (goals: Goal[]) => (goals.length ? Math.round(goals.reduce((sum, g) => sum + goalProgress(g), 0) / goals.length) : 0);
 
 export function formatMinutes(total: number) {
@@ -64,28 +79,51 @@ export function formatMinutes(total: number) {
   return minutes ? `${hours}h ${minutes}m` : `${hours}h`;
 }
 
-/** A real workspace has no history yet, so every figure comes from what is in it this week. */
-function ownStats(a: Activity): Stats {
-  const savedMinutes =
-    approved(a.history) * MINUTES_SAVED.approval + agentRuns(a.runs) * MINUTES_SAVED.agentRun + workflowRuns(a.workflows) * MINUTES_SAVED.workflowRun;
+/** A real account's figures, from its dated activity and the focus hours recorded each week. */
+function ownStats(a: Activity, range: RangeKey, now = Date.now()): Stats {
+  const timeline = a.timeline ?? emptyHistory();
+  const { weeks, label, compare, note } = OWN_RANGES[range];
+  const thisWeek = startOfWeek(now);
+  const from = shiftDays(thisWeek, -7 * (weeks - 1));
+  const mondays = (start: number) => Array.from({ length: weeks }, (_, i) => shiftDays(start, 7 * i));
+
+  // The calendar repeats each week, so this week is read live and earlier weeks from the saved record.
+  const focusOf = (monday: number) => (monday === thisWeek ? focusHours(a.events) : (timeline.focusWeeks[dayKey(monday)] ?? 0));
+  const current = mondays(from).map(focusOf);
+  const earlier = mondays(shiftDays(from, -7 * weeks)).filter((monday) => shiftDays(monday, 7) > timeline.since);
+  const focus = sum(current);
+  const previous = sum(earlier.map(focusOf));
+
+  const inRange = timeline.entries.filter((e) => e.at >= from && e.at <= now);
+  const savedMinutes = sum(inRange.map((e) => SAVED_BY_KIND[e.kind] ?? 0));
+  const short = (monday: number) => new Date(monday).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+
   return {
-    label: RANGES.week.label,
-    compare: RANGES.week.compare,
-    focus: focusHours(a.events),
-    focusDelta: null,
-    tasks: a.priorities.filter((p) => p.done).length + approved(a.history) + milestonesDone(a.goals),
-    tasksNote: "so far",
+    label,
+    compare,
+    focus,
+    focusDelta: earlier.length && previous > 0 ? Math.round((focus / previous - 1) * 100) : null,
+    tasks: inRange.filter((e) => DONE_KINDS.includes(e.kind)).length,
+    tasksNote: note,
     savedMinutes,
     saved: formatMinutes(savedMinutes),
     completion: completion(a.goals),
-    series: hoursByDay(a.events).map((d) => FOCUS_AREAS.reduce((sum, area) => sum + d.values[area], 0)),
-    labels: DAYS,
+    series: weeks === 1 ? hoursByDay(a.events).map((d) => sum(FOCUS_AREAS.map((area) => d.values[area]))) : current,
+    labels: weeks === 1 ? DAYS : mondays(from).map((m) => `Week of ${short(m)}`),
   };
+}
+
+/** Routine check-ins per day for the last `count` weeks, Monday first, capped at 4 for the heatmap. */
+export function checkinWeeks(timeline: History, count: number, now = Date.now()) {
+  const first = shiftDays(startOfWeek(now), -7 * (count - 1));
+  const perDay = new Map<string, number>();
+  for (const e of timeline.entries) if (e.kind === "checkin") perDay.set(dayKey(e.at), (perDay.get(dayKey(e.at)) ?? 0) + 1);
+  return Array.from({ length: count }, (_, w) => Array.from({ length: 7 }, (_, d) => Math.min(4, perDay.get(dayKey(shiftDays(first, 7 * w + d))) ?? 0)));
 }
 
 /** The sample's invented baseline plus everything done since, or only the user's own data. */
 export function liveStats(a: Activity, range: RangeKey): Stats {
-  if (!a.sample) return ownStats(a);
+  if (!a.sample) return ownStats(a, range);
   const base = RANGES[range];
 
   const tasks =
@@ -137,8 +175,9 @@ export function useLiveStats(range: RangeKey = "week") {
   const workflows = useStore((s) => s.workflows);
   const runs = useStore((s) => s.runs);
   const sample = useStore((s) => s.sample);
+  const timeline = useStore((s) => s.timeline);
   return useMemo(
-    () => liveStats({ priorities, history, goals, events, workflows, runs, sample }, range),
-    [priorities, history, goals, events, workflows, runs, sample, range],
+    () => liveStats({ priorities, history, goals, events, workflows, runs, sample, timeline }, range),
+    [priorities, history, goals, events, workflows, runs, sample, timeline, range],
   );
 }

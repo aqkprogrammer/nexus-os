@@ -3,7 +3,10 @@
 import { motion } from "motion/react";
 import { CheckCircle2, Circle, Compass, Crown, Eraser, LoaderCircle, Monitor, RotateCcw, Smartphone, Tablet } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { AccountSettings } from "@/components/AccountSettings";
+import { PlanCard } from "@/components/PlanCard";
+import { disablePush, enablePush, pushState, type PushState } from "@/lib/push-client";
 import { Bar, Btn, Card, Modal, Page, Pill, Toggle } from "@/components/ui";
 import { ROADMAP } from "@/lib/data";
 import { useStore } from "@/lib/store";
@@ -29,8 +32,8 @@ const DEVICES = [
   { icon: Tablet, name: "iPad Air", sync: "Last sync: 1 hr ago", active: false },
 ];
 
-/** Where the interface stands against the 90-day plan. */
-const ROADMAP_UI = ["UI built", "UI built", "UI built", "UI built", "UI built", "Next"];
+/** Where the product stands against the 90-day plan. Workflows still run on demand, and onboarding beyond the tour is still to do. */
+const ROADMAP_UI = ["Built", "Built", "Built", "Built", "Partly built", "Partly built"];
 
 function Row({ title, note, children }: { title: string; note: string; children: React.ReactNode }) {
   return (
@@ -41,6 +44,56 @@ function Row({ title, note, children }: { title: string; note: string; children:
       </span>
       {children}
     </li>
+  );
+}
+
+function NotificationPermission() {
+  const [state, setState] = useState<NotificationPermission | "unsupported" | null>(null);
+  useEffect(() => setState(typeof Notification === "undefined" ? "unsupported" : Notification.permission), []);
+
+  if (state === "granted") return <Pill className="border-nx-green/40 text-nx-green">On</Pill>;
+  if (state === "denied") return <span className="text-xs text-fg-3">Blocked in browser settings</span>;
+  if (state === "unsupported") return <span className="text-xs text-fg-3">Not supported here</span>;
+  return (
+    <Btn size="sm" tone="ghost" onClick={async () => setState(await Notification.requestPermission())}>
+      Turn on
+    </Btn>
+  );
+}
+
+const PUSH_NOTES: Partial<Record<PushState, string>> = {
+  unsupported: "Not supported in this browser. On iPhone, add NEXUS OS to your home screen first.",
+  unconfigured: "Not set up on this server yet",
+  denied: "Blocked in browser settings",
+};
+
+function PushSetting() {
+  const [state, setState] = useState<PushState | null>(null);
+  const [busy, setBusy] = useState(false);
+  const toast = useStore((s) => s.toast);
+  useEffect(() => {
+    void pushState().then(setState);
+  }, []);
+
+  if (!state) return null;
+  const note = PUSH_NOTES[state];
+  if (note) return <span className="max-w-[14rem] text-right text-xs text-fg-3">{note}</span>;
+  return (
+    <Toggle
+      on={state === "on"}
+      label="Push notifications"
+      onChange={async (on) => {
+        if (busy) return;
+        setBusy(true);
+        try {
+          setState(on ? await enablePush() : await disablePush());
+        } catch (e) {
+          toast(e instanceof Error ? e.message : "Couldn't change push notifications.", "warn");
+        } finally {
+          setBusy(false);
+        }
+      }}
+    />
   );
 }
 
@@ -93,38 +146,56 @@ export default function SettingsPage() {
 
         <Card title="Notifications" delay={0.1}>
           <ul className="divide-y divide-line/50">
-            <Row title="Push alerts" note="When an agent needs your approval.">
-              <Toggle on={prefs.pushAlerts} label="Push alerts" onChange={(v) => setPrefs({ pushAlerts: v })} />
-            </Row>
+            {/* An account gets the real push switch below instead. */}
+            {!account && (
+              <Row title="Push alerts" note="When an agent needs your approval.">
+                <Toggle on={prefs.pushAlerts} label="Push alerts" onChange={(v) => setPrefs({ pushAlerts: v })} />
+              </Row>
+            )}
             <Row title="Email digest" note="A daily summary at 7:00 AM.">
               <Toggle on={prefs.emailDigest} label="Email digest" onChange={(v) => setPrefs({ emailDigest: v })} />
             </Row>
+            {account ? (
+              <Row title="Push notifications" note="Agent results on this device, even when NEXUS OS is closed.">
+                <PushSetting />
+              </Row>
+            ) : (
+              <Row title="Browser notifications" note="Event reminders and agent results, even in another tab.">
+                <NotificationPermission />
+              </Row>
+            )}
             <Row title="Weekly review" note="Your week, scored every Sunday.">
               <Toggle on={prefs.weeklyReview} label="Weekly review" onChange={(v) => setPrefs({ weeklyReview: v })} />
             </Row>
           </ul>
         </Card>
 
-        <Card id="plan" title="Plan & Storage" delay={0.15} className="scroll-mt-4">
-          <div className="flex items-center gap-3 pt-1">
-            <Crown className="size-8 fill-nx-amber/30 text-nx-amber" strokeWidth={1.5} />
-            <div className="min-w-0 flex-1">
-              <div className="text-sm font-medium">{sample ? "Nexus Pro" : "Early access"}</div>
-              <div className="text-xs text-fg-3">{sample ? "All agents, unlimited workflows" : "Free while NEXUS OS is in early access"}</div>
+        {account ? (
+          <PlanCard />
+        ) : (
+          <Card id="plan" title="Plan & Storage" delay={0.15} className="scroll-mt-4">
+            <div className="flex items-center gap-3 pt-1">
+              <Crown className="size-8 fill-nx-amber/30 text-nx-amber" strokeWidth={1.5} />
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-medium">{sample ? "Nexus Pro" : "Early access"}</div>
+                <div className="text-xs text-fg-3">{sample ? "All agents, unlimited workflows" : "Free while NEXUS OS is in early access"}</div>
+              </div>
+              <Btn size="sm" tone="ghost" onClick={() => toast("Billing arrives with the Days 76-90 milestone", "info")}>
+                Change plan
+              </Btn>
             </div>
-            <Btn size="sm" tone="ghost" onClick={() => toast("Billing arrives with the Days 76-90 milestone", "info")}>
-              Change plan
-            </Btn>
-          </div>
-          <div className="mt-4 flex justify-between text-xs text-fg-2">
-            <span>AI Memory</span>
-            <span>{sample ? `${used} GB of 100 GB` : `${memories} ${memories === 1 ? "memory" : "memories"} saved`}</span>
-          </div>
-          {sample && <Bar value={used} className="mt-1.5" />}
-        </Card>
+            <div className="mt-4 flex justify-between text-xs text-fg-2">
+              <span>AI Memory</span>
+              <span>{sample ? `${used} GB of 100 GB` : `${memories} ${memories === 1 ? "memory" : "memories"} saved`}</span>
+            </div>
+            {sample && <Bar value={used} className="mt-1.5" />}
+          </Card>
+        )}
 
-        {/* The device list is invented, so a real account doesn't show it. */}
-        {sample && (
+        {account && <AccountSettings />}
+
+        {/* The device list is invented, so only the demo shows it. */}
+        {!account && sample && (
           <Card title="Devices" delay={0.2}>
             <ul className="space-y-1.5">
               {DEVICES.map((d) => (
@@ -167,12 +238,12 @@ export default function SettingsPage() {
           <ol className="grid gap-2 pt-1 sm:grid-cols-2 xl:grid-cols-6">
             {ROADMAP.map((r, i) => {
               const state = ROADMAP_UI[i];
-              const Icon = state === "UI built" ? CheckCircle2 : state === "Next" ? LoaderCircle : Circle;
+              const Icon = state === "Built" ? CheckCircle2 : state === "Partly built" ? LoaderCircle : Circle;
               return (
                 <motion.li key={r.days} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 + i * 0.05 }} className="nx-tile p-3">
                   <div className="flex items-center justify-between text-xs text-fg-3">
                     {r.days}
-                    <Icon className={state === "Next" ? "size-4 text-nx-amber" : "size-4 text-nx-green"} />
+                    <Icon className={state === "Built" ? "size-4 text-nx-green" : "size-4 text-nx-amber"} />
                   </div>
                   <div className="mt-1 text-sm font-medium">{r.title}</div>
                   <div className="mt-0.5 text-xs leading-5 text-fg-2">{r.items}</div>

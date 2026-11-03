@@ -9,7 +9,7 @@ import { Mascot } from "@/components/Mascot";
 import { Btn, Card, NumBadge } from "@/components/ui";
 import { AGENTS, MEMORY_ICONS } from "@/lib/data";
 import { useStore } from "@/lib/store";
-import { cn, dayLabel, timeAgo } from "@/lib/utils";
+import { cn, memoryWhen, timeAgo } from "@/lib/utils";
 
 export function MemoryTimeline() {
   const memories = useStore((s) => s.memories);
@@ -24,7 +24,7 @@ export function MemoryTimeline() {
             <motion.li key={m.id} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.4 + i * 0.07 }} className="relative flex items-center gap-2 text-xs">
               <span className={cn("relative z-10 size-2.5 shrink-0 rounded-full border-2 border-nx-pink bg-[#1a0e3a]", i === 0 && "shadow-[0_0_0.5rem_#ec4bb8]")} />
               <span className="w-[3.3rem] shrink-0 truncate text-[0.625rem] text-fg-3" suppressHydrationWarning>
-                {m.daysAgo === 0 ? m.time : dayLabel(m.daysAgo)}
+                {memoryWhen(m)}
               </span>
               <Icon className="size-3.5 shrink-0" style={{ color }} strokeWidth={1.8} />
               <span className="min-w-0 truncate text-fg">{m.title}</span>

@@ -19,6 +19,16 @@ model User {
   sessions      Session[]
   accounts      Account[]
   workspace     Workspace?
+  activities    Activity[]
+  focusWeeks    FocusWeek[]
+  memoryVectors MemoryVector[]
+  pushDevices   PushDevice[]
+  uploads       Upload[]
+  emailsSent    EmailLog[]
+  billing       Billing?
+  aiUsage       AiUsage[]
+  spaces        SpaceMember[]
+  spacesOwned   Space[]
 
   @@map("user")
 }
@@ -88,4 +98,173 @@ model Workspace {
   updatedAt DateTime @updatedAt
 
   @@map("workspace")
+}
+
+/// A dated record of something the user did, so analytics can look back over months.
+model Activity {
+  id     String   @id @default(cuid())
+  userId String
+  user   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  key    String
+  kind   String
+  title  String
+  at     DateTime
+
+  @@unique([userId, key])
+  @@index([userId, at])
+  @@map("activity")
+}
+
+/// Focus hours scheduled in a week. The calendar repeats weekly, so past weeks are kept as they were.
+model FocusWeek {
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// The local Monday that starts the week, as YYYY-MM-DD.
+  week   String
+  hours  Float
+
+  @@id([userId, week])
+  @@map("focus_week")
+}
+
+/// A memory's meaning as an embedding, so AI Brain can search by meaning. Needs the pgvector extension.
+model MemoryVector {
+  userId    String
+  user      User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  memoryId  String
+  /// The text that was embedded, so an unchanged memory isn't embedded again.
+  text      String
+  embedding Unsupported("vector(1536)")
+  updatedAt DateTime                    @updatedAt
+
+  @@id([userId, memoryId])
+  @@map("memory_vector")
+}
+
+/// A browser or phone that asked for push notifications.
+model PushDevice {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("push_device")
+}
+
+/// A file added to AI Brain. Kept in Postgres so there's no separate storage service to set up.
+model Upload {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  type      String
+  size      Int
+  data      Bytes
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("upload")
+}
+
+/// One row per summary email, so an email is never sent twice for the same day or week.
+model EmailLog {
+  userId String
+  user   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind   String
+  /// The user's local date the email covers, as YYYY-MM-DD.
+  period String
+  sentAt DateTime @default(now())
+
+  @@id([userId, kind, period])
+  @@map("email_log")
+}
+
+/// The account's Stripe customer and subscription, kept in step by Stripe's webhooks.
+model Billing {
+  userId           String    @id
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  customerId       String    @unique
+  subscriptionId   String?
+  /// Stripe's subscription status, like active, past_due or canceled.
+  status           String    @default("none")
+  plan             String    @default("free")
+  currentPeriodEnd DateTime?
+  updatedAt        DateTime  @updatedAt
+
+  @@map("billing")
+}
+
+/// AI requests per day, so each plan's daily allowance holds across server instances.
+model AiUsage {
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// The UTC date, as YYYY-MM-DD.
+  day    String
+  count  Int    @default(0)
+
+  @@id([userId, day])
+  @@map("ai_usage")
+}
+
+/// A space shared with family or a team: shared goals and a shared calendar, with a role per person.
+model Space {
+  id        String        @id @default(cuid())
+  name      String
+  ownerId   String
+  owner     User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt DateTime      @default(now())
+  members   SpaceMember[]
+  invites   SpaceInvite[]
+  items     SpaceItem[]
+
+  @@map("space")
+}
+
+model SpaceMember {
+  spaceId  String
+  space    Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// owner, editor or viewer.
+  role     String
+  joinedAt DateTime @default(now())
+
+  @@id([spaceId, userId])
+  @@index([userId])
+  @@map("space_member")
+}
+
+/// An invitation for one email address. It also lets that address create an account.
+model SpaceInvite {
+  id         String    @id @default(cuid())
+  spaceId    String
+  space      Space     @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  email      String
+  role       String
+  token      String    @unique
+  expiresAt  DateTime
+  acceptedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([email])
+  @@map("space_invite")
+}
+
+/// A shared goal or event. Each is its own row, so two people editing different items never collide.
+model SpaceItem {
+  id        String   @id @default(cuid())
+  spaceId   String
+  space     Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  /// goal or event.
+  kind      String
+  data      Json
+  createdBy String
+  updatedAt DateTime @updatedAt
+
+  @@index([spaceId])
+  @@map("space_item")
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { Mascot } from "@/components/Mascot";
 import { Btn, LinkBtn, Segmented } from "@/components/ui";
@@ -109,7 +110,13 @@ export function LoginForm() {
                     autoComplete={creating ? "new-password" : "current-password"}
                     className="nx-input mt-1.5"
                   />
-                  {creating && <p className="mt-1 text-[0.6875rem] text-fg-3">At least {MIN_PASSWORD} characters.</p>}
+                  {creating ? (
+                    <p className="mt-1 text-[0.6875rem] text-fg-3">At least {MIN_PASSWORD} characters.</p>
+                  ) : (
+                    <Link href="/reset-password" className="mt-1 inline-block text-[0.6875rem] text-nx-lilac hover:underline">
+                      Forgot your password?
+                    </Link>
+                  )}
                 </div>
 
                 {error && (

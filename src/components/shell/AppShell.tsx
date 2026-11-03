@@ -5,12 +5,17 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { CommandPalette } from "@/components/shell/CommandPalette";
 import { GlobalModals } from "@/components/shell/GlobalModals";
+import { QuickCapture } from "@/components/shell/QuickCapture";
 import { Sidebar } from "@/components/shell/Sidebar";
 import { Tour } from "@/components/shell/Tour";
 import { Topbar } from "@/components/shell/Topbar";
 import { Btn, Toaster } from "@/components/ui";
 import { useStore } from "@/lib/store";
 import { isStaticDemo } from "@/lib/utils";
+import { startGoogleSync } from "@/lib/google-client";
+import { acceptPendingInvite } from "@/lib/invites";
+import { registerServiceWorker } from "@/lib/push-client";
+import { startReminders } from "@/lib/reminders";
 import { loadWorkspace, startSync } from "@/lib/workspace-sync";
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -29,6 +34,10 @@ export function AppShell({ children }: { children: ReactNode }) {
       .then((loaded) => {
         if (!active || !loaded) return;
         useStore.getState().settleRuns();
+        useStore.getState().startWeek();
+        useStore.getState().startDay();
+        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        if (timezone && useStore.getState().timezone !== timezone) useStore.setState({ timezone });
         setStatus("ready");
       })
       .catch(() => active && setStatus("failed"));
@@ -42,6 +51,25 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [ready]);
 
   useEffect(() => {
+    if (ready && !isStaticDemo) return startGoogleSync();
+  }, [ready]);
+
+  useEffect(() => {
+    if (!ready || isStaticDemo) return;
+    const { toast } = useStore.getState();
+    void acceptPendingInvite(
+      (name) => toast(`You joined ${name}. Find it in Shared Spaces.`),
+      (message) => toast(message, "warn"),
+    );
+  }, [ready]);
+
+  useEffect(() => {
+    if (!ready) return;
+    registerServiceWorker();
+    return startReminders();
+  }, [ready]);
+
+  useEffect(() => {
     document.documentElement.dataset.motion = motionOn ? "on" : "off";
   }, [motionOn]);
 
@@ -50,6 +78,13 @@ export function AppShell({ children }: { children: ReactNode }) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         useStore.getState().setUi({ paletteOpen: !useStore.getState().paletteOpen });
+      }
+      // C opens quick capture, unless the user is typing somewhere or a dialog is open.
+      const target = e.target as HTMLElement;
+      const typing = target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
+      if (e.key.toLowerCase() === "c" && !e.metaKey && !e.ctrlKey && !e.altKey && !typing && !document.querySelector("[role=dialog]")) {
+        e.preventDefault();
+        useStore.getState().setUi({ captureOpen: true });
       }
     };
     window.addEventListener("keydown", onKey);
@@ -104,6 +139,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       {ready && <Tour />}
       <CommandPalette />
       <GlobalModals />
+      {ready && <QuickCapture />}
       <Toaster />
     </MotionConfig>
   );

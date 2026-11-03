@@ -1,3 +1,5 @@
+import { weekKey, type ActivityEntry, type History } from "./activity";
+import { focusHours } from "./stats";
 import { emptyWorkspace, savedState, useStore, type Store } from "./store";
 
 const ENDPOINT = "/api/workspace";
@@ -36,8 +38,8 @@ export async function loadWorkspace() {
   }
   if (!res.ok) throw new Error(`Workspace request failed: ${res.status}`);
 
-  const saved = (await res.json()) as { account: NonNullable<Store["account"]>; state: Partial<Store> | null; version: number };
-  useStore.setState({ account: saved.account });
+  const saved = (await res.json()) as { account: NonNullable<Store["account"]>; state: Partial<Store> | null; version: number; history: History };
+  useStore.setState({ account: saved.account, timeline: saved.history });
   if (saved.state) {
     apply(saved.state, saved.version);
   } else {
@@ -47,18 +49,31 @@ export async function loadWorkspace() {
   return true;
 }
 
-export async function saveWorkspace(keepalive = false) {
+let inFlight: Promise<void> = Promise.resolve();
+
+/** Saves now. If a save is already under way, waits for that one instead. */
+export function saveWorkspace(keepalive = false) {
+  if (saving) return inFlight;
+  inFlight = save(keepalive);
+  return inFlight;
+}
+
+async function save(keepalive: boolean) {
   clearTimeout(timer);
   const body = snapshot();
-  if (saving || body === lastSaved) return;
+  const { outbox, events } = useStore.getState();
+  if (saving || (body === lastSaved && !outbox.add.length && !outbox.remove.length)) return;
 
   saving = true;
   try {
+    // Activity and this week's focus hours travel with the save, so they land only if it does.
+    const extra = JSON.stringify({ activity: outbox, focusWeek: { week: weekKey(Date.now()), hours: focusHours(events) } });
+    const request = `{"state":${body},"version":${version},${extra.slice(1, -1)}}`;
     const res = await fetch(ENDPOINT, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: `{"state":${body},"version":${version}}`,
-      keepalive: keepalive && body.length < KEEPALIVE_LIMIT,
+      body: request,
+      keepalive: keepalive && request.length < KEEPALIVE_LIMIT,
     });
     if (res.status === 401) return toSignIn();
     if (res.status !== 200 && res.status !== 409) throw new Error(`Workspace save failed: ${res.status}`);
@@ -69,10 +84,14 @@ export async function saveWorkspace(keepalive = false) {
       useStore.getState().toast("Your workspace changed somewhere else, so your last edit was replaced.", "warn");
     } else {
       version = result.version;
-      if (res.status === 200) lastSaved = body;
+      if (res.status === 200) {
+        lastSaved = body;
+        sent(outbox.add, outbox.remove);
+      }
     }
     warned = false;
-    if (snapshot() !== lastSaved) later(SAVE_DELAY_MS);
+    const pending = useStore.getState().outbox;
+    if (snapshot() !== lastSaved || pending.add.length || pending.remove.length) later(SAVE_DELAY_MS);
   } catch {
     if (!warned) useStore.getState().toast("Couldn't save your latest changes. Retrying...", "warn");
     warned = true;
@@ -80,6 +99,13 @@ export async function saveWorkspace(keepalive = false) {
   } finally {
     saving = false;
   }
+}
+
+/** Drops activity the server now has, keeping anything added while the save was in flight. */
+function sent(added: ActivityEntry[], removed: string[]) {
+  useStore.setState((s) => ({
+    outbox: { add: s.outbox.add.filter((e) => !added.includes(e)), remove: s.outbox.remove.filter((k) => !removed.includes(k)) },
+  }));
 }
 
 /** Picks up changes from another tab or device, unless this one has edits still to save. */

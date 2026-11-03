@@ -1,9 +1,8 @@
-import { userInfo } from "node:os";
 import { defineConfig, devices } from "@playwright/test";
+import { DATABASE_URL } from "./e2e/db";
 
 const PORT = 3210;
 const MOCK_PORT = 3299;
-const DATABASE_URL = process.env.TEST_DATABASE_URL ?? `postgresql://${userInfo().username}@localhost:5432/nexus_os_test`;
 
 export default defineConfig({
   testDir: "e2e",
@@ -41,6 +40,25 @@ export default defineConfig({
         BETTER_AUTH_URL: `http://localhost:${PORT}`,
         BETTER_AUTH_SECRET: "test-only-secret-that-is-at-least-32-chars",
         ALLOWED_EMAILS: "@nexus.test",
+        // A key pair made only for tests, so push can be checked end to end against the mock.
+        NEXT_PUBLIC_VAPID_PUBLIC_KEY: "BPM8HYJfjJLqJAW2qbrBZbf86Dmv_3Jxm9URXywqZxibbYfUn7tCLkjTp_uppHK0RgsP1SHF2BPllss9qDlD_cI",
+        VAPID_PRIVATE_KEY: "3qzbK8LBTh3S2b6cQBwRgrarcHP8Rvy3gTdsIgLq5ak",
+        VAPID_SUBJECT: "mailto:tests@nexus.test",
+        PUSH_ALLOW_HTTP: "1",
+        RESEND_API_KEY: "test-resend-key",
+        RESEND_BASE_URL: `http://127.0.0.1:${MOCK_PORT}/resend`,
+        EMAIL_FROM: "NEXUS OS <hello@nexus.test>",
+        CRON_SECRET: "test-cron-secret",
+        GOOGLE_CLIENT_ID: "test-google-client",
+        GOOGLE_CLIENT_SECRET: "test-google-secret",
+        GOOGLE_API_BASE: `http://127.0.0.1:${MOCK_PORT}/google`,
+        STRIPE_SECRET_KEY: "sk_test_mock",
+        STRIPE_PRICE_PRO: "price_pro_mock",
+        STRIPE_WEBHOOK_SECRET: "whsec_test_secret",
+        STRIPE_API_BASE: `http://127.0.0.1:${MOCK_PORT}`,
+        PRO_PRICE_LABEL: "$12 a month",
+        // Low, so a test can reach the Free plan's limit quickly.
+        FREE_AI_DAILY: "3",
       },
     },
   ],

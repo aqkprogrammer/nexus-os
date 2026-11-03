@@ -3,7 +3,7 @@
 import { animate, AnimatePresence, motion } from "motion/react";
 import { Check, CircleAlert, Info, X } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useRef, useState, type ComponentProps, type PointerEvent, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ComponentProps, type PointerEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
@@ -166,6 +166,7 @@ export function Modal({
   className?: string;
 }) {
   const [mounted, setMounted] = useState(false);
+  const titleId = useId();
   useEffect(() => setMounted(true), []);
 
   useEffect(() => {
@@ -189,6 +190,7 @@ export function Modal({
           <motion.div
             role="dialog"
             aria-modal="true"
+            aria-labelledby={title ? titleId : undefined}
             initial={{ opacity: 0, y: 18, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.98 }}
@@ -203,7 +205,11 @@ export function Modal({
             >
               <X className="size-4" />
             </button>
-            {title && <h2 className="pr-8 text-lg font-semibold">{title}</h2>}
+            {title && (
+              <h2 id={titleId} className="pr-8 text-lg font-semibold">
+                {title}
+              </h2>
+            )}
             {subtitle && <p className="mt-0.5 pr-8 text-sm text-fg-3">{subtitle}</p>}
             {children}
           </motion.div>

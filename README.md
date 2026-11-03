@@ -6,7 +6,9 @@ Your personal AI operating system. One intelligent workspace that understands yo
 
 ![NEXUS OS dashboard](docs/screenshots/dashboard.png)
 
-This repository is the complete frontend, plus accounts, a Postgres database and a real AI chat endpoint. The GitHub Pages demo has no server, so it has no login, keeps data in your browser and uses built-in demo replies.
+This repository is the full app: accounts, a Postgres database, AI chat and agents, email, push notifications, Google Calendar and Gmail, Stripe billing and shared spaces. Each outside service is optional. Without its key, the feature says it isn't set up rather than failing.
+
+The GitHub Pages demo has no server, so it has no login, keeps data in your browser and uses built-in demo replies.
 
 ## Screenshots
 
@@ -32,7 +34,11 @@ This repository is the complete frontend, plus accounts, a Postgres database and
 
 ## Run it
 
-You need Node.js and a running Postgres server.
+You need Node.js and a running Postgres server with the [pgvector](https://github.com/pgvector/pgvector) extension. On a Mac with Homebrew:
+
+```bash
+brew install pgvector
+```
 
 1. Install the packages and copy the settings template:
 
@@ -44,7 +50,7 @@ You need Node.js and a running Postgres server.
    cp .env.example .env.local
    ```
 
-2. Fill in `DATABASE_URL`, `BETTER_AUTH_SECRET` and `ALLOWED_EMAILS` in `.env.local`.
+2. Fill in `DATABASE_URL`, `BETTER_AUTH_SECRET` and `ALLOWED_EMAILS` in `.env.local`. The rest of the file is optional, one block per feature.
 
 3. Create the database and its tables:
 
@@ -76,7 +82,7 @@ Then open http://localhost:3000 and create an account with an email from `ALLOWE
 
 ## Testing
 
-`npm test` builds the app and drives it in a real browser, covering the main flows on desktop and every page at phone size. Each test signs in to a fresh account. Chat runs through the real endpoint against a small mock in `e2e/mock-openai.mjs`, so tests are free and need no key. Local runs use your installed Chrome.
+`npm test` builds the app and drives it in a real browser, covering the main flows on desktop and every page at phone size. Each test signs in to a fresh account. Every outside service runs against a stand-in in `e2e/mock-openai.mjs`: OpenAI, Resend, Stripe, Google and a push service. Tests are free and need no keys. Local runs use your installed Chrome.
 
 The tests need a separate database, which they migrate themselves:
 
@@ -96,25 +102,51 @@ Sign-in uses email and password through [Better Auth](https://www.better-auth.co
 - **Each account has its own workspace.** It is saved to Postgres shortly after every change, and nothing personal stays in the browser.
 - **New accounts start empty.** Every figure comes from the account's own data, and nothing invented, like the sample's weather, rankings or history, is shown. Settings can load the sample data to explore, or clear the workspace again.
 - **Two open tabs can't silently overwrite each other.** A save from an out-of-date tab is refused, and that tab reloads the newer workspace and says so.
-- **There is no password reset or email verification yet.** Both need an email provider.
+- **Activity is dated.** Finished tasks, approvals, routine check-ins and agent runs are recorded, so Life Analytics shows real weeks, months and quarters.
+- **Settings has full account control.** Change your email or password, see and sign out other devices, export everything, or delete the account.
+- **Password reset and email confirmation** work once email is set up.
 
 The API routes check the session on every request. `src/proxy.ts` only redirects signed-out visitors, so it is not what protects the data.
 
-## Real AI chat
+## AI
 
-The companion streams replies from OpenAI, answers from your workspace data, and can add tasks, save memories, schedule events, create goals and launch agents.
+Add your key to `OPENAI_API_KEY` in `.env.local`, then restart `npm run dev`. That turns on:
 
-Add your key to `OPENAI_API_KEY` in `.env.local`, then restart `npm run dev`.
+- **Chat.** Replies stream from OpenAI, use your workspace and memories that match the question, and can add tasks, save memories, schedule events, create goals and launch agents.
+- **Agents.** An agent does the task and leaves the actual result, a draft, plan or list, in Action Center for your approval.
+- **Goal plans.** New goals get milestones written for that goal and your calendar.
+- **Quick capture.** Press C anywhere to jot a note. AI sorts it into a task, memory, event or idea.
+- **File reading.** Receipts, PDFs and images uploaded to AI Brain become memories of what's in them.
+- **Memory search.** AI Brain finds memories by meaning, using pgvector.
 
-Without a key, the chat falls back to demo replies and says so under its name. `OPENAI_MODEL` selects any Responses API model.
+Without a key, each of these says so and falls back: demo chat replies, agent previews, a starting goal template, simple sorting rules and word search.
 
-**Privacy:** each message sends a snapshot of the workspace to OpenAI, including tasks, calendar, goals and up to 40 memories. Requests use `store: false`.
+**Privacy:** AI requests send the parts of your workspace they need to OpenAI, including tasks, calendar, goals and memories, with `store: false`. Text that came from other people, like email subjects, is marked as data so the model doesn't follow instructions inside it.
 
-**Cost control:** the endpoint requires a signed-in user, checks the request origin, allows 15 requests a minute per user, and caps message size and reply length. The chat rate limit is per server instance, so set a monthly spend limit in your OpenAI account before deploying.
+**Cost control:** every AI request needs a signed-in user, is rate limited per user and has capped sizes. With billing set up, each plan also has a daily AI allowance (`FREE_AI_DAILY`, `PRO_AI_DAILY`). Set a monthly spend limit in your OpenAI account before deploying.
+
+## Other services
+
+| Feature | Set up | Without it |
+| --- | --- | --- |
+| Password reset, email confirmation, invitations, daily and weekly summaries | `RESEND_API_KEY`, `EMAIL_FROM` and `CRON_SECRET`, with `/api/cron/digest` called every hour | Reset says email isn't set up, and invitations give a link to share |
+| Push notifications and installing on a phone | A VAPID key pair from `npx web-push generate-vapid-keys` | The app still installs, and Settings says push isn't set up |
+| Google Calendar and Gmail, read only | `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` | Automation Hub says Google isn't set up |
+| Billing | `STRIPE_SECRET_KEY`, `STRIPE_PRICE_PRO` and `STRIPE_WEBHOOK_SECRET` | Everyone has unlimited use |
+
+- **Summaries** go out at 7 AM in each person's time zone, and the weekly review on Sunday at 6 PM. They only go to confirmed email addresses, and Settings turns them off.
+- **Gmail is a restricted scope.** Until Google verifies your app, up to 100 test users can connect it.
+- **Push** only sends to the push services of Google, Mozilla, Apple and Microsoft, so the server can't be pointed at other addresses.
+- **Uploads** are stored in Postgres, up to 4 MB each and 200 MB per account. Only images, PDFs and text files are accepted, and they always download as attachments.
+- **Stripe** hosts the payment and billing pages, so card details never reach this server.
+
+## Shared spaces
+
+Create a space for family or a team, then invite people by email as editors or viewers. Everyone sees the same shared goals and calendar. Editors can change them, viewers can only look, and only the owner manages members. An invitation also lets that email create an account, even when it isn't in `ALLOWED_EMAILS`.
 
 ## Deployment
 
-**Full app:** deploy to a Node host such as Vercel with a hosted Postgres database. Set every variable from `.env.example` in the host's settings, with `BETTER_AUTH_URL` set to the deployed address, and run `npm run db:deploy` against that database. Never commit secrets.
+**Full app:** deploy to a Node host such as Vercel with a hosted Postgres database that has pgvector. Set the variables from `.env.example` in the host's settings, with `BETTER_AUTH_URL` set to the deployed address, and run `npm run db:deploy` against that database. `vercel.json` runs the summary job every hour, which needs a Vercel plan that allows hourly crons. Never commit secrets.
 
 **Demo:** every push to `main` runs `.github/workflows/deploy.yml`, which tests the app, then publishes a static build to GitHub Pages. Setting `PAGES_BASE_PATH` selects that build and leaves out the API and login. Setting `SITE_URL` makes the link preview image use a full URL.
 
@@ -123,15 +155,16 @@ Without a key, the chat falls back to demo replies and says so under its name. `
 | Route | Module | What works today |
 | --- | --- | --- |
 | `/` | Home | The nine-card dashboard, real AI companion chat and daily insight |
-| `/brain` | AI Brain | Context graph, memory search and filters, pin, add, delete |
-| `/agents` | AI Agents | Ten agents, launch flow, live step-by-step runs |
-| `/planner` | Life Planner | Tasks, week calendar, routines with streaks |
-| `/analytics` | Life Analytics | Date ranges, trend, stacked hours, heatmap, table view |
-| `/automations` | Automation Hub | Workflow runner, flow diagram, app connections, templates |
-| `/goals` | Goal Intelligence | Generated plans, milestones, scheduling into today |
+| `/brain` | AI Brain | Context graph, search by meaning, file uploads, pin, add, delete |
+| `/agents` | AI Agents | Ten agents that do real work with AI, live step-by-step runs |
+| `/planner` | Life Planner | Repeating tasks, week calendar with Google events and reminders, routines |
+| `/analytics` | Life Analytics | Weeks, months and quarters from dated activity, heatmap, table view |
+| `/automations` | Automation Hub | Workflow runner, flow diagram, Google connection, templates |
+| `/goals` | Goal Intelligence | AI-written plans, milestones, scheduling into today |
+| `/spaces` | Shared Spaces | Shared goals and calendar, invitations, editor and viewer roles |
 | `/actions` | Actions | Approve, decline, snooze, bulk approve, history |
-| `/privacy` | Privacy Vault | Vault controls, permission matrix, JSON export, erase |
-| `/settings` | Settings | Profile, appearance, notifications, plan, devices, roadmap |
+| `/privacy` | Privacy Vault | Vault controls, permission matrix, full export, erase |
+| `/settings` | Settings | Profile, account, devices, push, plan and billing, roadmap |
 
 ## Project layout
 
@@ -149,22 +182,25 @@ src/lib/auth.ts        Better Auth setup and the sign-up invite list
 src/lib/db.ts          Prisma client
 src/lib/companion.ts   Demo replies used when no model is available
 src/lib/chat-*.ts      Chat client, workspace context and tool definitions
-src/app/api/chat/      Streaming OpenAI endpoint
-src/app/api/workspace/ Reads and saves the signed-in user's workspace
+src/lib/ai.ts          Shared rules and structured requests for every AI endpoint
+src/lib/activity.ts    Dated activity and the week and day helpers analytics uses
+src/app/api/           Chat, workspace, agents, plans, capture, memory search, uploads,
+                       account, push, Google, billing, shared spaces and the summary job
 src/app/login/         Sign in and create account
+src/app/reset-password/  Password reset
+public/                App manifest, icons and the service worker for push
 prisma/                Database schema and migrations
 ```
 
 ## Connecting the backend
 
-Chat, accounts and saved workspaces are already real. The rest of the interface is ready for the stack below, and each remaining piece is simulated in one place, so it can be swapped without touching the screens.
+Most of the product is real now. What's still simulated is in one place each, so it can be swapped without touching the screens.
 
 | Replace | With |
 | --- | --- |
-| `draftPlan` in `src/lib/store.ts` | A goal-planning model call |
-| `launchAgent` in `src/lib/store.ts` | The LangGraph execution engine |
-| `runWorkflow` and `toggleApp` in `src/lib/store.ts` | Redis queues and MCP connectors |
-| Seed data in `src/lib/data.ts` | Real data from integrations, with pgvector for memory search |
+| `runWorkflow` in `src/lib/store.ts` | Redis queues that run workflows on a schedule |
+| Apps other than Google in Automation Hub | MCP connectors |
+| `launchAgent` in `src/lib/store.ts` | The LangGraph engine, for agents that take more than one step |
 
 | Layer | Technology |
 | --- | --- |

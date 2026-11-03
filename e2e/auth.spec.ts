@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { expect, newEmail, ORIGIN, PASSWORD, signUp, test } from "./helpers";
+import { createAccount, expect, newEmail, ORIGIN, PASSWORD, signUp, skipTour, test } from "./helpers";
 
 const fill = async (page: Page, email: string, password = PASSWORD) => {
   await page.getByLabel("Email").fill(email);
@@ -12,14 +12,6 @@ const signIn = async (page: Page, email: string, password = PASSWORD) => {
   await page.getByRole("button", { name: "Sign in", exact: true }).last().click();
 };
 
-const createAccount = async (page: Page, email: string, name: string) => {
-  await page.goto("/login");
-  await page.getByRole("tab", { name: "Create account" }).click();
-  await page.getByLabel("Name").fill(name);
-  await fill(page, email);
-  await page.getByRole("button", { name: "Create account" }).last().click();
-};
-
 const signOut = async (page: Page, name: string) => {
   await page.getByRole("banner").getByRole("button", { name: new RegExp(name) }).click();
   await page.getByRole("button", { name: "Sign out" }).click();
@@ -29,7 +21,6 @@ const signOut = async (page: Page, name: string) => {
 // Next.js keeps its own empty alert on the page for route announcements.
 const alert = (page: Page, text: string | RegExp) => page.getByRole("alert").filter({ hasText: text });
 
-const skipTour = (page: Page) => page.getByRole("button", { name: "Skip" }).click();
 
 test.describe("signed out", () => {
   test.use({ signedIn: false });
@@ -68,7 +59,7 @@ test.describe("signed out", () => {
     await skipTour(page);
     // Each of these only exists in the sample data.
     const invented = ["72°F", "top 12%", "1,342", "Nexus Pro", "iPhone 15 Pro", "Your best focus is before 11 AM", "Read your calendar"];
-    for (const path of ["/", "/brain", "/agents", "/planner", "/analytics", "/automations", "/goals", "/actions", "/privacy", "/settings"]) {
+    for (const path of ["/", "/brain", "/agents", "/planner", "/analytics", "/automations", "/goals", "/actions", "/privacy", "/settings", "/spaces"]) {
       await page.goto(path);
       await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
       for (const text of invented) await expect(page.locator("main"), `${text} on ${path}`).not.toContainText(text);

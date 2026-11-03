@@ -4,7 +4,9 @@ import { AnimatePresence, motion } from "motion/react";
 import { ArrowDown, ArrowRight, Check, Play, Plus, Zap } from "lucide-react";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { Btn, Card, Modal, Page, Pill, Stat, Toggle, enter } from "@/components/ui";
-import { APPS, WORKFLOW_TEMPLATES, type Workflow } from "@/lib/data";
+import { authClient } from "@/lib/auth-client";
+import { APPS, WORKFLOW_TEMPLATES, type AppId, type Workflow } from "@/lib/data";
+import { GOOGLE_SCOPES, refreshGoogle } from "@/lib/google-client";
 import { useLiveStats } from "@/lib/stats";
 import { useStore } from "@/lib/store";
 import { cn, timeAgo } from "@/lib/utils";
@@ -44,6 +46,41 @@ function FlowDiagram({ workflow, step }: { workflow: Workflow; step: number | nu
   );
 }
 
+const GOOGLE_APPS: AppId[] = ["gmail", "calendar"];
+
+/** For a real account, Gmail and Calendar connect through Google. The other apps aren't built yet, so they say so. */
+function AccountAppSwitch({ id, name }: { id: AppId; name: string }) {
+  const google = useStore((s) => s.google);
+  const toast = useStore((s) => s.toast);
+  const [busy, setBusy] = useState(false);
+
+  if (!GOOGLE_APPS.includes(id)) return <span className="shrink-0 text-xs text-fg-3">Coming soon</span>;
+  if (!google) return null;
+  if (!google.configured) return <span className="max-w-[7rem] shrink-0 text-right text-xs text-fg-3">Needs Google sign-in set up</span>;
+
+  return (
+    <Toggle
+      on={google.connected}
+      label={`Connect ${name}`}
+      onChange={async (on) => {
+        if (busy) return;
+        setBusy(true);
+        if (on) {
+          // Leaves for Google's consent screen and comes back here.
+          const { error } = await authClient.linkSocial({ provider: "google", scopes: GOOGLE_SCOPES, callbackURL: "/automations#apps" });
+          if (error) toast("Couldn't reach Google. Try again.", "warn");
+        } else {
+          const res = await fetch("/api/google", { method: "DELETE" });
+          if (!res.ok) toast("Couldn't disconnect Google. Try again.", "warn");
+          else toast("Google disconnected. Gmail and Calendar are off.", "info");
+          await refreshGoogle();
+        }
+        setBusy(false);
+      }}
+    />
+  );
+}
+
 export default function AutomationsPage() {
   const workflows = useStore((s) => s.workflows);
   const apps = useStore((s) => s.apps);
@@ -53,6 +90,8 @@ export default function AutomationsPage() {
   const runWorkflow = useStore((s) => s.runWorkflow);
   const addWorkflow = useStore((s) => s.addWorkflow);
   const toast = useStore((s) => s.toast);
+  const account = useStore((s) => s.account);
+  const google = useStore((s) => s.google);
 
   const { saved } = useLiveStats();
   const [selected, setSelected] = useState("w1");
@@ -64,7 +103,8 @@ export default function AutomationsPage() {
 
   const current = workflows.find((w) => w.id === selected) ?? workflows[0];
   const active = workflows.filter((w) => w.enabled).length;
-  const connected = APPS.filter((a) => apps[a.id]).length;
+  // A real account counts only what is really connected: Google, for now.
+  const connected = account ? (google?.connected ? GOOGLE_APPS.length : 0) : APPS.filter((a) => apps[a.id]).length;
   const totalRuns = workflows.reduce((sum, w) => sum + w.runs, 0);
 
   useEffect(() => () => {
@@ -184,16 +224,20 @@ export default function AutomationsPage() {
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm text-fg">{a.name}</span>
-                <span className="block truncate text-xs text-fg-3">{apps[a.id] ? a.desc : "Not connected"}</span>
+                <span className="block truncate text-xs text-fg-3">{(account ? GOOGLE_APPS.includes(a.id) && google?.connected : apps[a.id]) ? a.desc : "Not connected"}</span>
               </span>
-              <Toggle
-                on={apps[a.id]}
-                label={`Connect ${a.name}`}
-                onChange={(on) => {
-                  toggleApp(a.id);
-                  toast(on ? `${a.name} connected` : `${a.name} disconnected`, "info");
-                }}
-              />
+              {account ? (
+                <AccountAppSwitch id={a.id} name={a.name} />
+              ) : (
+                <Toggle
+                  on={apps[a.id]}
+                  label={`Connect ${a.name}`}
+                  onChange={(on) => {
+                    toggleApp(a.id);
+                    toast(on ? `${a.name} connected` : `${a.name} disconnected`, "info");
+                  }}
+                />
+              )}
             </motion.div>
           ))}
         </div>

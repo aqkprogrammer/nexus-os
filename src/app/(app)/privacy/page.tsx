@@ -26,7 +26,14 @@ export default function PrivacyPage() {
   const toast = useStore((s) => s.toast);
   const [confirming, setConfirming] = useState(false);
 
+  const account = useStore((s) => s.account);
+
   const exportData = () => {
+    // A signed-in account downloads everything stored on the server, not just this page's copy.
+    if (account) {
+      window.location.assign("/api/account/export");
+      return;
+    }
     const { memories: m, goals, ideas, priorities, events, habits, workflows, permissions: p, privacy: pv } = useStore.getState();
     const blob = new Blob([JSON.stringify({ memories: m, goals, ideas, priorities, events, habits, workflows, permissions: p, privacy: pv }, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);

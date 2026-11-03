@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { Bell, ChevronDown, LockKeyhole, LogOut, Menu, Search, Settings, ShieldCheck, Sparkles, Target, UserRound } from "lucide-react";
+import { Bell, ChevronDown, LockKeyhole, LogOut, Menu, Plus, Search, Settings, ShieldCheck, Sparkles, Target, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { authClient } from "@/lib/auth-client";
@@ -157,6 +157,16 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
         </div>
 
         <span className="mx-1 hidden h-8 w-px bg-line xl:block" />
+
+        <button
+          type="button"
+          aria-label="Quick capture"
+          title="Quick capture (C)"
+          onClick={() => setUi({ captureOpen: true })}
+          className="grid size-10 cursor-pointer place-items-center rounded-full text-fg transition-colors hover:bg-white/8"
+        >
+          <Plus className="size-5.5" strokeWidth={1.7} />
+        </button>
 
         <div ref={bellRef} className="relative">
           <button
