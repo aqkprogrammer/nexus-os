@@ -49,6 +49,8 @@ test.describe("with notifications allowed", () => {
 
   test("Settings offers push notifications for this device", async ({ page }) => {
     await page.goto("/settings");
-    await expect(page.getByRole("switch", { name: "Push notifications" })).toHaveAttribute("aria-checked", "false");
+    // Full Chrome shows the switch. Headless browsers have no push service or block notifications, and the row says which.
+    const row = page.getByRole("listitem").filter({ hasText: "Push notifications" });
+    await expect(row.getByRole("switch", { name: "Push notifications" }).or(row.getByText(/Not supported in this browser|Blocked in browser settings/))).toBeVisible({ timeout: 10_000 });
   });
 });

@@ -20,11 +20,19 @@ async function subscription() {
   return registration.pushManager.getSubscription();
 }
 
+/** Some browsers have the push API but no push service behind it, and never answer. */
+const CHECK_TIMEOUT_MS = 4000;
+
 export async function pushState(): Promise<PushState> {
   if (!supported()) return "unsupported";
   if (!PUBLIC_KEY) return "unconfigured";
   if (Notification.permission === "denied") return "denied";
-  return (await subscription()) ? "on" : "off";
+  const timeout = new Promise<"unsupported">((resolve) => setTimeout(() => resolve("unsupported"), CHECK_TIMEOUT_MS));
+  const check = subscription().then(
+    (sub) => (sub ? "on" : "off") as PushState,
+    () => "unsupported" as const,
+  );
+  return Promise.race([check, timeout]);
 }
 
 function keyBytes(base64: string) {
