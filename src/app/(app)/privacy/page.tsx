@@ -4,9 +4,9 @@ import { motion } from "motion/react";
 import { Download, Eye, Lock, Trash2, UsersRound } from "lucide-react";
 import { useState } from "react";
 import { Btn, Card, Modal, Page, Toggle } from "@/components/ui";
-import { AGENTS, AUDIT_LOG, PERMISSIONS } from "@/lib/data";
+import { AGENTS, AUDIT_LOG, agentById, PERMISSIONS } from "@/lib/data";
 import { useStore } from "@/lib/store";
-import { cn } from "@/lib/utils";
+import { cn, timeAgo } from "@/lib/utils";
 
 const PERMISSION_HELP = { read: "See your data", write: "Change drafts and notes", send: "Message others", spend: "Move money" };
 
@@ -19,6 +19,10 @@ export default function PrivacyPage() {
   const privateMode = useStore((s) => s.privateMode);
   const setPill = useStore((s) => s.setPill);
   const memories = useStore((s) => s.memories.length);
+  const sample = useStore((s) => s.sample);
+  const runs = useStore((s) => s.runs);
+  // The sample keeps its invented log. A real account only lists what its agents actually did.
+  const log = sample ? AUDIT_LOG : runs.map((r) => ({ who: agentById(r.agent).name, what: `ran "${r.task}"`, at: timeAgo(r.at) }));
   const toast = useStore((s) => s.toast);
   const [confirming, setConfirming] = useState(false);
 
@@ -131,15 +135,18 @@ export default function PrivacyPage() {
         <div className="space-y-3">
           <Card title="Audit Log" subtitle="Every time anything touched your data." delay={0.12}>
             <ol className="space-y-2.5">
-              {AUDIT_LOG.map((l) => (
-                <li key={l.what} className="flex gap-2.5 text-[0.8125rem]">
+              {log.map((l, i) => (
+                <li key={i} className="flex gap-2.5 text-[0.8125rem]">
                   <span className="mt-1.5 size-2 shrink-0 rounded-full bg-nx-violet" />
                   <span className="min-w-0 flex-1">
                     <span className="text-fg">{l.who}</span> <span className="text-fg-2">{l.what}</span>
-                    <span className="block text-[0.6875rem] text-fg-3">{l.at}</span>
+                    <span className="block text-[0.6875rem] text-fg-3" suppressHydrationWarning>
+                      {l.at}
+                    </span>
                   </span>
                 </li>
               ))}
+              {log.length === 0 && <li className="text-[0.8125rem] text-fg-3">No agent has touched your data yet.</li>}
             </ol>
           </Card>
 

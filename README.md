@@ -94,7 +94,7 @@ Sign-in uses email and password through [Better Auth](https://www.better-auth.co
 
 - **Sign-up is invite-only.** Only emails in `ALLOWED_EMAILS` can create an account, so a public deployment can't be used to spend your OpenAI credit.
 - **Each account has its own workspace.** It is saved to Postgres shortly after every change, and nothing personal stays in the browser.
-- **New accounts start with the sample data,** so the app has something to show before integrations exist.
+- **New accounts start empty.** Every figure comes from the account's own data, and nothing invented, like the sample's weather, rankings or history, is shown. Settings can load the sample data to explore, or clear the workspace again.
 - **Two open tabs can't silently overwrite each other.** A save from an out-of-date tab is refused, and that tab reloads the newer workspace and says so.
 - **There is no password reset or email verification yet.** Both need an email provider.
 

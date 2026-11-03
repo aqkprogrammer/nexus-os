@@ -1,4 +1,4 @@
-import { savedState, useStore, type Store } from "./store";
+import { emptyWorkspace, savedState, useStore, type Store } from "./store";
 
 const ENDPOINT = "/api/workspace";
 const SAVE_DELAY_MS = 500;
@@ -38,8 +38,12 @@ export async function loadWorkspace() {
 
   const saved = (await res.json()) as { account: NonNullable<Store["account"]>; state: Partial<Store> | null; version: number };
   useStore.setState({ account: saved.account });
-  if (saved.state) apply(saved.state, saved.version);
-  else useStore.getState().setProfile({ name: saved.account.name });
+  if (saved.state) {
+    apply(saved.state, saved.version);
+  } else {
+    useStore.setState(emptyWorkspace());
+    useStore.getState().setProfile({ name: saved.account.name });
+  }
   return true;
 }
 

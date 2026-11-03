@@ -22,10 +22,13 @@ const HEAT_WEEKS = Array.from({ length: 16 }, (_, w) =>
   }),
 );
 
+const EMPTY_WEEKS = HEAT_WEEKS.map((week) => week.map(() => 0));
+
 export default function AnalyticsPage() {
   const [range, setRange] = useState<RangeKey>("week");
   const [view, setView] = useState<"chart" | "table">("chart");
   const d = useLiveStats(range);
+  const sample = useStore((s) => s.sample);
   const habits = useStore((s) => s.habits);
   const goals = useStore((s) => s.goals);
   const events = useStore((s) => s.events);
@@ -39,16 +42,16 @@ export default function AnalyticsPage() {
   const thisWeek = DAYS.map((_, day) => Math.min(4, habits.filter((h) => h.week[day]).length));
 
   return (
-    <Page title="Life Analytics" subtitle="Progress, productivity and insights." actions={<Segmented id="range" value={range} options={OPTIONS} onChange={setRange} />}>
+    <Page title="Life Analytics" subtitle="Progress, productivity and insights." actions={sample && <Segmented id="range" value={range} options={OPTIONS} onChange={setRange} />}>
       <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="Focus time" value={<CountUp to={d.focus} format={hours} />} note={`${d.focusDelta >= 0 ? "Up" : "Down"} ${Math.abs(d.focusDelta)}% vs ${d.compare}`} />
+        <Stat label="Focus time" value={<CountUp to={d.focus} format={hours} />} note={d.focusDelta === null ? "Scheduled this week" : `${d.focusDelta >= 0 ? "Up" : "Down"} ${Math.abs(d.focusDelta)}% vs ${d.compare}`} />
         <Stat label="Tasks done" value={<CountUp to={d.tasks} format={whole} />} note={d.tasksNote} delay={0.05} />
         <Stat label="Time saved by agents" value={d.saved} note="Automations and agent runs" delay={0.1} />
         <Stat label="Plan completion" value={<CountUp to={d.completion} format={percent} />} note={`Across ${goals.length} active goals`} delay={0.15} />
       </div>
 
       <div className="grid gap-3 xl:grid-cols-5">
-        <Card title="Focus Trend" subtitle={`Hours of deep work, ${d.label.toLowerCase()}`} delay={0.1} className="!overflow-visible xl:col-span-3">
+        <Card title="Focus Trend" subtitle={sample ? `Hours of deep work, ${d.label.toLowerCase()}` : "Hours of work and learning scheduled each day"} delay={0.1} className="!overflow-visible xl:col-span-3">
           <AreaChart key={range} data={d.series} labels={d.labels} format={tip} label={`Focus trend ${d.label}`} axis className="mt-2 h-60" color="#b57bff" />
         </Card>
 
@@ -130,12 +133,14 @@ export default function AnalyticsPage() {
         </Card>
 
         <Card title="Routine Consistency" subtitle={`${logged} check-ins logged this week`} delay={0.24} className="xl:col-span-3">
-          <Heatmap weeks={[...HEAT_WEEKS.slice(0, -1), thisWeek]} />
+          {/* The earlier weeks are invented, so a real account shows them empty. */}
+          <Heatmap weeks={[...(sample ? HEAT_WEEKS : EMPTY_WEEKS).slice(0, -1), thisWeek]} />
         </Card>
 
         <Card title="What Nexus Noticed" delay={0.28} className="xl:col-span-5" bodyClass="!pt-1">
+          {!sample && <p className="py-2 text-sm text-fg-2">Nexus needs a few weeks of your activity before it can spot patterns worth sharing.</p>}
           <ul className="grid gap-2 md:grid-cols-3">
-            {ANALYTICS_INSIGHTS.map((i) => (
+            {(sample ? ANALYTICS_INSIGHTS : []).map((i) => (
               <li key={i.title} className="nx-tile flex gap-2.5 p-3">
                 <Lightbulb className="mt-0.5 size-4.5 shrink-0 text-nx-amber" />
                 <span>

@@ -192,11 +192,13 @@ export default function PlannerPage() {
   const removePriority = useStore((s) => s.removePriority);
   const habits = useStore((s) => s.habits);
   const toggleHabit = useStore((s) => s.toggleHabit);
+  const addHabit = useStore((s) => s.addHabit);
   const addEvent = useStore((s) => s.addEvent);
   const removeEvent = useStore((s) => s.removeEvent);
   const toast = useStore((s) => s.toast);
 
   const [task, setTask] = useState("");
+  const [routine, setRoutine] = useState("");
   const [slot, setSlot] = useState<{ day: number; start: number } | null>(null);
   const [draft, setDraft] = useState({ title: "", duration: 1, area: "Work" as LifeArea });
   const [opened, setOpened] = useState<CalEvent | null>(null);
@@ -278,7 +280,22 @@ export default function PlannerPage() {
                   </span>
                 </li>
               ))}
+              {habits.length === 0 && <li className="py-2 text-center text-xs text-fg-3">No routines yet. Add one you want to keep up.</li>}
             </ul>
+            <form
+              className="mt-2 flex gap-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!routine.trim()) return;
+                addHabit(routine.trim());
+                setRoutine("");
+              }}
+            >
+              <input aria-label="New routine" value={routine} onChange={(e) => setRoutine(e.target.value)} placeholder="Add a routine" className="nx-input" />
+              <Btn type="submit" aria-label="Add routine" className="!px-3" disabled={!routine.trim()}>
+                <Plus className="size-4" />
+              </Btn>
+            </form>
           </Card>
         </div>
 

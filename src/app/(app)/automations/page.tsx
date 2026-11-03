@@ -130,6 +130,7 @@ export default function AutomationsPage() {
                 <Toggle on={w.enabled} label={`${w.name} enabled`} onChange={() => toggleWorkflow(w.id)} />
               </li>
             ))}
+            {workflows.length === 0 && <li className="py-6 text-center text-sm text-fg-3">No workflows yet. Start one with New workflow.</li>}
           </ul>
         </Card>
 

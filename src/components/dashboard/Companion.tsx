@@ -18,6 +18,13 @@ const CHIPS = [
   { label: "Which goal needs me?", icon: Goal, color: "#f472b6" },
 ];
 
+/** A real account starts empty, so its greeting doesn't claim work that hasn't happened. */
+const FIRST_GREETINGS = {
+  Warm: (name: string) => `Hello, ${name}! ☀️ Tell me what's on your plate, and I'll help you plan it and keep track of it.`,
+  Direct: (name: string) => `${name}, tell me what you need done and I'll set it up.`,
+  Playful: (name: string) => `Hey ${name}! 🎉 Hand me your to-dos, goals and wild ideas, and I'll help you wrangle them.`,
+};
+
 const GREETINGS = {
   Warm: (name: string) => `Hello, ${name}! ☀️ I've organized your day, reviewed what matters, and found a few opportunities for you.`,
   Direct: (name: string) => `${name}, your day is organized. Priorities are set and opportunities are flagged.`,
@@ -61,6 +68,7 @@ function ChatBody({ expanded }: { expanded: boolean }) {
   const toast = useStore((s) => s.toast);
   const name = useStore((s) => s.profile.name);
   const tone = useStore((s) => s.profile.companionTone);
+  const sample = useStore((s) => s.sample);
   const [text, setText] = useState("");
   const [menu, setMenu] = useState(false);
   const [listening, setListening] = useState(false);
@@ -145,7 +153,7 @@ function ChatBody({ expanded }: { expanded: boolean }) {
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="flex items-end gap-1.5">
           <Mascot variant="head" className="w-9 shrink-0" />
           <div className="rounded-2xl rounded-bl-sm border border-line bg-white/4 px-3.5 py-2.5 text-[0.8125rem] leading-5 text-fg">
-            {GREETINGS[tone](name)}
+            {(sample ? GREETINGS : FIRST_GREETINGS)[tone](name)}
             <br />
             <br />
             Shall we get started?

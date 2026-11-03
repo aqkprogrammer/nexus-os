@@ -53,7 +53,7 @@ export function companionReply(input: string, s: Store, today: number): Reply {
   if (/progress|update|analytic|stats|week/.test(q)) {
     const w = liveStats(s, "week");
     return {
-      text: `This week you logged ${w.focus} focus hours, up ${w.focusDelta}% on ${w.compare}. You finished ${w.tasks} tasks, and automations saved you ${w.saved}.`,
+      text: `This week you logged ${w.focus} focus hours${w.focusDelta === null ? "" : `, ${w.focusDelta >= 0 ? "up" : "down"} ${Math.abs(w.focusDelta)}% on ${w.compare}`}. You finished ${w.tasks} tasks, and automations saved you ${w.saved}.`,
       link: { label: "See Life Analytics", href: "/analytics" },
     };
   }

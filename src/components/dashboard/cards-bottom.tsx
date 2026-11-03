@@ -31,6 +31,7 @@ export function MemoryTimeline() {
             </motion.li>
           );
         })}
+        {memories.length === 0 && <li className="py-4 pl-4 text-xs text-fg-3">Nothing saved yet. Notes, promises and ideas you keep will appear here.</li>}
       </ol>
       <div className="pt-2">
         <Link href="/brain" className="nx-btn h-8 w-full text-[0.8125rem]">
@@ -262,6 +263,7 @@ export function AutomationCard() {
             </li>
           );
         })}
+        {workflows.length === 0 && <li className="px-2 text-xs text-fg-3">No automations yet. Start from a template in Automation Hub.</li>}
         <li className="2xl:hidden">
           <Link href="/automations" className="nx-btn h-7 w-full px-3 text-[0.6875rem]" data-tone="ghost">
             View All Flows <ArrowRight className="size-3" />

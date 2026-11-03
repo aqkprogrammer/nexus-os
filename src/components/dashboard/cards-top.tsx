@@ -30,6 +30,7 @@ export function MorningBrief() {
             </button>
           </li>
         ))}
+        {priorities.length === 0 && <li className="max-w-[10rem] text-xs leading-5 text-fg-3">No priorities yet. Ask Nexus or add one in Life Planner.</li>}
       </ul>
       <div className="pointer-events-none absolute right-1 bottom-10 animate-float-sm">
         <Mascot className="h-[7.2rem] w-auto" title="Nexus mascot holding a heart" />
@@ -146,20 +147,25 @@ const count = (v: number) => Math.round(v).toLocaleString("en-US");
 
 export function AnalyticsOverview() {
   const [range, setRange] = useState<RangeKey>("week");
+  const sample = useStore((s) => s.sample);
   const d = useLiveStats(range);
-  const up = d.focusDelta >= 0;
+  const up = (d.focusDelta ?? 0) >= 0;
   const tip = useCallback((v: number) => `${v.toFixed(1)} hrs`, []);
 
   return (
-    <Card n={3} tone="blue" title="Life Analytics" right={<RangeSelect value={range} onChange={setRange} />} delay={0.2} className="!overflow-visible">
+    <Card n={3} tone="blue" title="Life Analytics" right={sample ? <RangeSelect value={range} onChange={setRange} /> : <span className="text-[0.6875rem] text-fg-3">{d.label}</span>} delay={0.2} className="!overflow-visible">
       <p className="text-[0.6875rem] text-fg-2">Focus Time</p>
       <div className="text-xl leading-6 font-semibold">
         <CountUp to={d.focus} format={hrs} />
       </div>
-      <p className="flex items-center gap-1 text-[0.6875rem] text-fg-3">
-        {up ? <ArrowUp className="size-3 text-nx-green" /> : <ArrowDown className="size-3 text-nx-rose" />}
-        <span className={up ? "text-nx-green" : "text-nx-rose"}>{Math.abs(d.focusDelta)}%</span> vs {d.compare}
-      </p>
+      {d.focusDelta === null ? (
+        <p className="text-[0.6875rem] text-fg-3">Scheduled on your calendar</p>
+      ) : (
+        <p className="flex items-center gap-1 text-[0.6875rem] text-fg-3">
+          {up ? <ArrowUp className="size-3 text-nx-green" /> : <ArrowDown className="size-3 text-nx-rose" />}
+          <span className={up ? "text-nx-green" : "text-nx-rose"}>{Math.abs(d.focusDelta)}%</span> vs {d.compare}
+        </p>
+      )}
       <AreaChart data={d.series} labels={d.labels} format={tip} label={`Focus time ${d.label}`} className="my-1 min-h-[2.6rem] flex-1" color="#c084fc" />
       <dl className="grid grid-cols-2 gap-2 text-[0.6875rem]">
         <div>
@@ -219,10 +225,11 @@ export function GoalRadar() {
             </li>
           );
         })}
+        {goals.length === 0 && <li className="py-4 text-center text-xs text-fg-3">No goals yet. Tell Nexus what you want to achieve.</li>}
       </ul>
       <div className="pt-2">
         <Link href="/goals" className="nx-btn h-8 w-full text-[0.8125rem]">
-          View All
+          {goals.length ? "View All" : "Set a goal"}
         </Link>
       </div>
     </Card>

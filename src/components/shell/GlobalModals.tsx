@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Mascot } from "@/components/Mascot";
 import { Btn, Modal } from "@/components/ui";
-import { ACTION_ICONS, AGENTS, agentById, RANGES, type AgentId } from "@/lib/data";
+import { ACTION_ICONS, AGENTS, agentById, type AgentId } from "@/lib/data";
+import { useLiveStats } from "@/lib/stats";
 import { useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
@@ -128,15 +129,17 @@ function BriefModal() {
   const name = useStore((s) => s.profile.name);
   const close = () => setUi({ briefOpen: false });
   const openItems = priorities.filter((p) => !p.done);
-  const week = RANGES.week;
+  const week = useLiveStats();
 
   return (
     <Modal open={open} onClose={close} title="Your Morning Brief" subtitle="Prepared from your calendar, goals and memories." className="max-w-xl">
       <div className="mt-4 flex items-start gap-3">
         <Mascot variant="head" className="w-12 shrink-0" />
         <p className="text-sm leading-6 text-fg-2">
-          Hi {name}, you have {openItems.length} open {openItems.length === 1 ? "priority" : "priorities"} and {actions.length} {actions.length === 1 ? "action" : "actions"} to review. Focus
-          time is up {week.focusDelta}% on {week.compare}, so protect your morning block and clear approvals after lunch.
+          Hi {name}, you have {openItems.length} open {openItems.length === 1 ? "priority" : "priorities"} and {actions.length} {actions.length === 1 ? "action" : "actions"} to review. {" "}
+          {week.focusDelta === null
+            ? `You have ${week.focus} hrs of focus time on your calendar this week.`
+            : `Focus time is ${week.focusDelta >= 0 ? "up" : "down"} ${Math.abs(week.focusDelta)}% on ${week.compare}, so protect your morning block and clear approvals after lunch.`}
         </p>
       </div>
       <h3 className="mt-4 text-xs font-semibold tracking-wide text-fg-3 uppercase">Start with</h3>

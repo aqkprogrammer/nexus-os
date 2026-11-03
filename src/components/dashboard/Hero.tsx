@@ -20,6 +20,7 @@ const ORBS = [
 
 export function Hero() {
   const name = useStore((s) => s.profile.name);
+  const sample = useStore((s) => s.sample);
   const [now, setNow] = useState<Date | null>(null);
 
   useEffect(() => {
@@ -53,10 +54,13 @@ export function Hero() {
             <CalendarDays className="size-4" strokeWidth={1.7} />
             <span suppressHydrationWarning>{now ? now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" }) : "Today"}</span>
           </span>
-          <span className="flex items-center gap-2">
-            <Sun className="size-4 animate-spin-slow text-nx-amber" />
-            72°F
-          </span>
+          {/* There's no weather source yet, so only the sample shows a temperature. */}
+          {sample && (
+            <span className="flex items-center gap-2">
+              <Sun className="size-4 animate-spin-slow text-nx-amber" />
+              72°F
+            </span>
+          )}
           <span className="flex items-center gap-2">
             <Clock className="size-4" strokeWidth={1.7} />
             <span suppressHydrationWarning>{now ? now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : "--:--"}</span>

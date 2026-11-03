@@ -53,10 +53,44 @@ test.describe("signed out", () => {
     expect((await request.post("/api/chat", { headers, data: { messages: [], context: {} } })).status()).toBe(401);
   });
 
-  test("a new account starts with its own name and the tour", async ({ page }) => {
+  test("a new account starts empty, with its own name and the tour", async ({ page }) => {
     await createAccount(page, newEmail(), "Priya");
     await expect(page.getByRole("dialog", { name: "Welcome tour" })).toBeVisible();
     await expect(page.getByRole("banner")).toContainText("Priya");
+    await skipTour(page);
+    await expect(page.locator("main")).toContainText("No priorities yet");
+    await expect(page.locator("main")).toContainText("No goals yet");
+    await expect(page.locator("main")).not.toContainText("Follow up with Laura");
+  });
+
+  test("an empty account shows no invented figures on any page", async ({ page }) => {
+    await createAccount(page, newEmail(), "Priya");
+    await skipTour(page);
+    // Each of these only exists in the sample data.
+    const invented = ["72°F", "top 12%", "1,342", "Nexus Pro", "iPhone 15 Pro", "Your best focus is before 11 AM", "Read your calendar"];
+    for (const path of ["/", "/brain", "/agents", "/planner", "/analytics", "/automations", "/goals", "/actions", "/privacy", "/settings"]) {
+      await page.goto(path);
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+      for (const text of invented) await expect(page.locator("main"), `${text} on ${path}`).not.toContainText(text);
+    }
+  });
+
+  test("settings can load the sample data and clear it again", async ({ page }) => {
+    await createAccount(page, newEmail(), "Priya");
+    await skipTour(page);
+    await page.goto("/settings");
+
+    await page.getByRole("button", { name: "Load sample data" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Load sample data" }).click();
+    await page.goto("/");
+    await expect(page.getByRole("checkbox", { name: "Follow up with Laura" })).toBeVisible();
+    await expect(page.getByRole("banner")).toContainText("Priya");
+
+    await page.goto("/settings");
+    await page.getByRole("button", { name: "Clear workspace" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Clear everything" }).click();
+    await page.goto("/");
+    await expect(page.locator("main")).toContainText("No priorities yet");
   });
 
   test("an email that isn't invited can't sign up", async ({ page }) => {
@@ -87,21 +121,23 @@ test.describe("signed out", () => {
     const email = newEmail();
     await createAccount(page, email, "Priya");
     await skipTour(page);
-    await page.getByRole("checkbox", { name: "Follow up with Laura" }).click();
-    await expect(page.getByRole("checkbox", { name: "Follow up with Laura" })).toBeChecked();
+    await page.goto("/planner");
+    await page.getByLabel("New task").fill("Book the dentist");
+    await page.getByLabel("New task").press("Enter");
+    await expect(page.locator("main")).toContainText("Book the dentist");
 
     expect(await page.evaluate(() => localStorage.length)).toBe(0);
     await signOut(page, "Priya");
 
     await createAccount(page, newEmail(), "Sam");
     await skipTour(page);
-    await expect(page.getByRole("checkbox", { name: "Follow up with Laura" })).not.toBeChecked();
+    await expect(page.locator("main")).not.toContainText("Book the dentist");
     await signOut(page, "Sam");
 
     await context.clearCookies();
     await signIn(page, email);
     await expect(page.getByRole("banner")).toContainText("Priya");
-    await expect(page.getByRole("checkbox", { name: "Follow up with Laura" })).toBeChecked();
+    await expect(page.getByRole("checkbox", { name: "Book the dentist" })).toBeVisible();
   });
 });
 

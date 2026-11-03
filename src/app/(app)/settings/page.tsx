@@ -1,12 +1,27 @@
 "use client";
 
 import { motion } from "motion/react";
-import { CheckCircle2, Circle, Compass, Crown, LoaderCircle, Monitor, RotateCcw, Smartphone, Tablet } from "lucide-react";
+import { CheckCircle2, Circle, Compass, Crown, Eraser, LoaderCircle, Monitor, RotateCcw, Smartphone, Tablet } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Bar, Btn, Card, Modal, Page, Pill, Toggle } from "@/components/ui";
 import { ROADMAP } from "@/lib/data";
 import { useStore } from "@/lib/store";
+
+const CONFIRM = {
+  sample: {
+    title: "Load the sample data?",
+    subtitle: "This replaces your priorities, memories, goals and settings with the sample data. It can't be undone.",
+    button: "Load sample data",
+    done: "Sample data loaded",
+  },
+  empty: {
+    title: "Clear your workspace?",
+    subtitle: "This removes every priority, memory, goal, event and automation. It can't be undone.",
+    button: "Clear everything",
+    done: "Workspace cleared",
+  },
+};
 
 const DEVICES = [
   { icon: Smartphone, name: "iPhone 15 Pro", sync: "Last sync: 2 min ago", active: true },
@@ -34,12 +49,15 @@ export default function SettingsPage() {
   const prefs = useStore((s) => s.prefs);
   const setProfile = useStore((s) => s.setProfile);
   const setPrefs = useStore((s) => s.setPrefs);
-  const resetDemo = useStore((s) => s.resetDemo);
+  const loadSample = useStore((s) => s.loadSample);
+  const clearWorkspace = useStore((s) => s.clearWorkspace);
   const memories = useStore((s) => s.memories.length);
+  const sample = useStore((s) => s.sample);
+  const account = useStore((s) => s.account);
   const toast = useStore((s) => s.toast);
   const setTourDone = useStore((s) => s.setTourDone);
   const router = useRouter();
-  const [confirming, setConfirming] = useState(false);
+  const [confirming, setConfirming] = useState<keyof typeof CONFIRM | null>(null);
   const used = Math.min(100, 57 + memories);
 
   return (
@@ -91,8 +109,8 @@ export default function SettingsPage() {
           <div className="flex items-center gap-3 pt-1">
             <Crown className="size-8 fill-nx-amber/30 text-nx-amber" strokeWidth={1.5} />
             <div className="min-w-0 flex-1">
-              <div className="text-sm font-medium">Nexus Pro</div>
-              <div className="text-xs text-fg-3">All agents, unlimited workflows</div>
+              <div className="text-sm font-medium">{sample ? "Nexus Pro" : "Early access"}</div>
+              <div className="text-xs text-fg-3">{sample ? "All agents, unlimited workflows" : "Free while NEXUS OS is in early access"}</div>
             </div>
             <Btn size="sm" tone="ghost" onClick={() => toast("Billing arrives with the Days 76-90 milestone", "info")}>
               Change plan
@@ -100,27 +118,30 @@ export default function SettingsPage() {
           </div>
           <div className="mt-4 flex justify-between text-xs text-fg-2">
             <span>AI Memory</span>
-            <span>{used} GB of 100 GB</span>
+            <span>{sample ? `${used} GB of 100 GB` : `${memories} ${memories === 1 ? "memory" : "memories"} saved`}</span>
           </div>
-          <Bar value={used} className="mt-1.5" />
+          {sample && <Bar value={used} className="mt-1.5" />}
         </Card>
 
-        <Card title="Devices" delay={0.2}>
-          <ul className="space-y-1.5">
-            {DEVICES.map((d) => (
-              <li key={d.name} className="nx-tile flex items-center gap-3 px-3 py-2">
-                <d.icon className="size-5 text-fg-2" strokeWidth={1.6} />
-                <span className="min-w-0 flex-1">
-                  <span className="block text-sm">{d.name}</span>
-                  <span className="block text-xs text-fg-3">{d.sync}</span>
-                </span>
-                <Pill className={d.active ? "border-nx-green/40 text-nx-green" : "border-nx-amber/40 text-nx-amber"}>{d.active ? "Active" : "Idle"}</Pill>
-              </li>
-            ))}
-          </ul>
-        </Card>
+        {/* The device list is invented, so a real account doesn't show it. */}
+        {sample && (
+          <Card title="Devices" delay={0.2}>
+            <ul className="space-y-1.5">
+              {DEVICES.map((d) => (
+                <li key={d.name} className="nx-tile flex items-center gap-3 px-3 py-2">
+                  <d.icon className="size-5 text-fg-2" strokeWidth={1.6} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm">{d.name}</span>
+                    <span className="block text-xs text-fg-3">{d.sync}</span>
+                  </span>
+                  <Pill className={d.active ? "border-nx-green/40 text-nx-green" : "border-nx-amber/40 text-nx-amber"}>{d.active ? "Active" : "Idle"}</Pill>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
 
-        <Card title="Demo Data" subtitle="Everything you change is saved in this browser." delay={0.25}>
+        <Card title={account ? "Workspace" : "Demo Data"} subtitle={account ? "Saved to your account." : "Everything you change is saved in this browser."} delay={0.25}>
           <div className="flex flex-wrap gap-2 pt-1">
             <Btn
               tone="ghost"
@@ -131,9 +152,14 @@ export default function SettingsPage() {
             >
               <Compass className="size-4" /> Replay tour
             </Btn>
-            <Btn tone="rose" onClick={() => setConfirming(true)}>
-              <RotateCcw className="size-4" /> Reset to sample data
+            <Btn tone={account ? "ghost" : "rose"} onClick={() => setConfirming("sample")}>
+              <RotateCcw className="size-4" /> {account ? "Load sample data" : "Reset to sample data"}
             </Btn>
+            {account && (
+              <Btn tone="rose" onClick={() => setConfirming("empty")}>
+                <Eraser className="size-4" /> Clear workspace
+              </Btn>
+            )}
           </div>
         </Card>
 
@@ -158,20 +184,21 @@ export default function SettingsPage() {
         </Card>
       </div>
 
-      <Modal open={confirming} onClose={() => setConfirming(false)} title="Reset to sample data?" subtitle="This replaces your priorities, memories, goals and settings with the sample data. It can't be undone.">
+      <Modal open={confirming !== null} onClose={() => setConfirming(null)} title={CONFIRM[confirming ?? "sample"].title} subtitle={CONFIRM[confirming ?? "sample"].subtitle}>
         <div className="mt-5 flex justify-end gap-2">
-          <Btn tone="ghost" onClick={() => setConfirming(false)}>
+          <Btn tone="ghost" onClick={() => setConfirming(null)}>
             Cancel
           </Btn>
           <Btn
             tone="rose"
             onClick={() => {
-              resetDemo();
-              setConfirming(false);
-              toast("Sample data restored");
+              if (confirming === "empty") clearWorkspace();
+              else loadSample();
+              toast(CONFIRM[confirming ?? "sample"].done);
+              setConfirming(null);
             }}
           >
-            Reset
+            {CONFIRM[confirming ?? "sample"].button}
           </Btn>
         </div>
       </Modal>

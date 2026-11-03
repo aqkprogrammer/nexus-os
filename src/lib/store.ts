@@ -120,6 +120,25 @@ const seed = () => ({
   safeMode: true,
   online: true,
   tourDone: false,
+  sample: true,
+});
+
+/** Where a real account starts: the same settings, with none of the sample content. */
+export const emptyWorkspace = () => ({
+  ...seed(),
+  priorities: [],
+  actions: [],
+  history: [],
+  memories: [],
+  ideas: [],
+  goals: [],
+  events: [],
+  habits: [],
+  workflows: [],
+  notices: [],
+  profile: { ...seed().profile, role: "Early access" },
+  apps: Object.fromEntries(Object.keys(seed().apps).map((id) => [id, false])) as Record<AppId, boolean>,
+  sample: false,
 });
 
 export interface Store extends ReturnType<typeof seed> {
@@ -163,6 +182,7 @@ export interface Store extends ReturnType<typeof seed> {
   moveEvent: (id: string, patch: Pick<CalEvent, "day" | "start" | "duration">) => void;
   removeEvent: (id: string) => void;
   toggleHabit: (id: string, day: number) => void;
+  addHabit: (title: string) => void;
 
   launchAgent: (agent: AgentId, task: string) => void;
   settleRuns: () => void;
@@ -185,7 +205,8 @@ export interface Store extends ReturnType<typeof seed> {
   setPrivacy: (p: Partial<Privacy>) => void;
   setPill: (key: "privateMode" | "safeMode" | "online", value: boolean) => void;
   setTourDone: (done: boolean) => void;
-  resetDemo: () => void;
+  loadSample: () => void;
+  clearWorkspace: () => void;
 }
 
 /** Turns a goal title into a concrete milestone plan. A model call replaces this later. */
@@ -220,235 +241,244 @@ export function savedState(s: Store) {
 
 export const useStore = create<Store>()(
   persist(
-    (set, get) => ({
-      ...seed(),
+    (set, get) => {
+      /** Swaps the content but keeps who the user is and whether they've seen the tour. */
+      const replaceWorkspace = (next: ReturnType<typeof seed>) => {
+        const { account, tourDone } = get();
+        set({ ...next, tourDone, selectedGoal: next.goals[0]?.id ?? "" });
+        if (account) get().setProfile({ name: account.name });
+      };
 
-      account: null,
-      toasts: [],
-      launch: { open: false },
-      reviewing: null,
-      briefOpen: false,
-      paletteOpen: false,
-      chatExpanded: false,
-      chatStatus: "idle",
-      chatMode: null,
-      selectedGoal: "g1",
+      return {
+        ...seed(),
 
-      toast: (text, tone = "good", action) => {
-        const id = uid();
-        set((s) => ({ toasts: [...s.toasts.slice(-2), { id, text, tone, action }] }));
-        setTimeout(() => get().dismissToast(id), action ? UNDO_TOAST_MS : TOAST_MS);
-      },
-      dismissToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
-      setUi: (patch) => set(patch),
+        account: null,
+        toasts: [],
+        launch: { open: false },
+        reviewing: null,
+        briefOpen: false,
+        paletteOpen: false,
+        chatExpanded: false,
+        chatStatus: "idle",
+        chatMode: null,
+        selectedGoal: "g1",
 
-      togglePriority: (id) =>
-        set((s) => ({ priorities: s.priorities.map((p) => (p.id === id ? { ...p, done: !p.done } : p)) })),
-      addPriority: (title) =>
-        set((s) => ({ priorities: [...s.priorities, { id: uid(), title, done: false } satisfies Priority] })),
-      removePriority: (id) => {
-        const index = get().priorities.findIndex((p) => p.id === id);
-        if (index < 0) return;
-        const item = get().priorities[index];
-        set((s) => ({ priorities: s.priorities.filter((p) => p.id !== id) }));
-        get().toast("Task removed", "info", { label: "Undo", run: () => set((s) => ({ priorities: reinsert(s.priorities, item, index) })) });
-      },
+        toast: (text, tone = "good", action) => {
+          const id = uid();
+          set((s) => ({ toasts: [...s.toasts.slice(-2), { id, text, tone, action }] }));
+          setTimeout(() => get().dismissToast(id), action ? UNDO_TOAST_MS : TOAST_MS);
+        },
+        dismissToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
+        setUi: (patch) => set(patch),
 
-      resolveAction: (id, outcome) => {
-        const item = get().actions.find((a) => a.id === id);
-        if (!item) return;
-        const record: ActionRecord = { id: uid(), title: item.title, outcome, agent: item.agent, at: Date.now() };
-        set((s) => ({
-          actions: s.actions.filter((a) => a.id !== id),
-          history: [record, ...s.history],
-          reviewing: null,
-        }));
-        get().toast(outcome === "approved" ? `Approved: ${item.title}` : `Declined: ${item.title}`, outcome === "approved" ? "good" : "info");
-      },
-      snoozeAction: (id) => {
-        set((s) => {
-          const item = s.actions.find((a) => a.id === id);
-          if (!item) return s;
-          return { actions: [...s.actions.filter((a) => a.id !== id), item], reviewing: null };
-        });
-        get().toast("Snoozed. Moved to the end of your queue.", "info");
-      },
+        togglePriority: (id) =>
+          set((s) => ({ priorities: s.priorities.map((p) => (p.id === id ? { ...p, done: !p.done } : p)) })),
+        addPriority: (title) =>
+          set((s) => ({ priorities: [...s.priorities, { id: uid(), title, done: false } satisfies Priority] })),
+        removePriority: (id) => {
+          const index = get().priorities.findIndex((p) => p.id === id);
+          if (index < 0) return;
+          const item = get().priorities[index];
+          set((s) => ({ priorities: s.priorities.filter((p) => p.id !== id) }));
+          get().toast("Task removed", "info", { label: "Undo", run: () => set((s) => ({ priorities: reinsert(s.priorities, item, index) })) });
+        },
 
-      addMemory: ({ title, detail = "", type = "note", area = "Work" }) => {
-        const m: Memory = {
-          id: uid(),
-          title,
-          detail,
-          type,
-          area,
-          daysAgo: 0,
-          time: new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
-        };
-        set((s) => ({ memories: [m, ...s.memories] }));
-      },
-      removeMemory: (id) => {
-        const index = get().memories.findIndex((m) => m.id === id);
-        if (index < 0) return;
-        const item = get().memories[index];
-        set((s) => ({ memories: s.memories.filter((m) => m.id !== id) }));
-        get().toast("Memory deleted", "info", { label: "Undo", run: () => set((s) => ({ memories: reinsert(s.memories, item, index) })) });
-      },
-      togglePin: (id) =>
-        set((s) => ({ memories: s.memories.map((m) => (m.id === id ? { ...m, pinned: !m.pinned } : m)) })),
-      eraseMemories: () => {
-        const erased = get().memories;
-        set({ memories: [] });
-        get().toast("All memories erased", "info", { label: "Undo", run: () => set({ memories: erased }) });
-      },
+        resolveAction: (id, outcome) => {
+          const item = get().actions.find((a) => a.id === id);
+          if (!item) return;
+          const record: ActionRecord = { id: uid(), title: item.title, outcome, agent: item.agent, at: Date.now() };
+          set((s) => ({
+            actions: s.actions.filter((a) => a.id !== id),
+            history: [record, ...s.history],
+            reviewing: null,
+          }));
+          get().toast(outcome === "approved" ? `Approved: ${item.title}` : `Declined: ${item.title}`, outcome === "approved" ? "good" : "info");
+        },
+        snoozeAction: (id) => {
+          set((s) => {
+            const item = s.actions.find((a) => a.id === id);
+            if (!item) return s;
+            return { actions: [...s.actions.filter((a) => a.id !== id), item], reviewing: null };
+          });
+          get().toast("Snoozed. Moved to the end of your queue.", "info");
+        },
 
-      addIdea: (title, tag) =>
-        set((s) => ({ ideas: [{ id: uid(), title, tag, starred: false } satisfies Idea, ...s.ideas] })),
-      toggleIdea: (id) =>
-        set((s) => ({ ideas: s.ideas.map((i) => (i.id === id ? { ...i, starred: !i.starred } : i)) })),
-      promoteIdea: (id) => {
-        const idea = get().ideas.find((i) => i.id === id);
-        if (!idea) return;
-        const goal = makeGoal(idea.title, idea.tag, "3 months");
-        set((s) => ({
-          ideas: s.ideas.filter((i) => i.id !== id),
-          goals: [goal, ...s.goals],
-          selectedGoal: goal.id,
-        }));
-        return goal.id;
-      },
+        addMemory: ({ title, detail = "", type = "note", area = "Work" }) => {
+          const m: Memory = {
+            id: uid(),
+            title,
+            detail,
+            type,
+            area,
+            daysAgo: 0,
+            time: new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
+          };
+          set((s) => ({ memories: [m, ...s.memories] }));
+        },
+        removeMemory: (id) => {
+          const index = get().memories.findIndex((m) => m.id === id);
+          if (index < 0) return;
+          const item = get().memories[index];
+          set((s) => ({ memories: s.memories.filter((m) => m.id !== id) }));
+          get().toast("Memory deleted", "info", { label: "Undo", run: () => set((s) => ({ memories: reinsert(s.memories, item, index) })) });
+        },
+        togglePin: (id) =>
+          set((s) => ({ memories: s.memories.map((m) => (m.id === id ? { ...m, pinned: !m.pinned } : m)) })),
+        eraseMemories: () => {
+          const erased = get().memories;
+          set({ memories: [] });
+          get().toast("All memories erased", "info", { label: "Undo", run: () => set({ memories: erased }) });
+        },
 
-      addGoal: (title, area, due) => {
-        const goal = makeGoal(title, area, due);
-        set((s) => ({ goals: [goal, ...s.goals], selectedGoal: goal.id }));
-        return goal.id;
-      },
-      toggleMilestone: (goalId, milestoneId) =>
-        set((s) => ({
-          goals: s.goals.map((g) =>
-            g.id === goalId
-              ? { ...g, milestones: g.milestones.map((m) => (m.id === milestoneId ? { ...m, done: !m.done } : m)) }
-              : g,
-          ),
-        })),
-      scheduleNext: (goalId) => {
-        const goal = get().goals.find((g) => g.id === goalId);
-        const next = goal?.milestones.find((m) => !m.done);
-        if (!goal || !next) return;
-        if (get().priorities.some((p) => p.title === next.title)) {
-          get().toast("That step is already in today's priorities.", "info");
-          return;
-        }
-        get().addPriority(next.title);
-        get().toast("Added to today's priorities");
-      },
+        addIdea: (title, tag) =>
+          set((s) => ({ ideas: [{ id: uid(), title, tag, starred: false } satisfies Idea, ...s.ideas] })),
+        toggleIdea: (id) =>
+          set((s) => ({ ideas: s.ideas.map((i) => (i.id === id ? { ...i, starred: !i.starred } : i)) })),
+        promoteIdea: (id) => {
+          const idea = get().ideas.find((i) => i.id === id);
+          if (!idea) return;
+          const goal = makeGoal(idea.title, idea.tag, "3 months");
+          set((s) => ({
+            ideas: s.ideas.filter((i) => i.id !== id),
+            goals: [goal, ...s.goals],
+            selectedGoal: goal.id,
+          }));
+          return goal.id;
+        },
 
-      addEvent: (e) => set((s) => ({ events: [...s.events, { ...e, id: uid() }] })),
-      moveEvent: (id, patch) => set((s) => ({ events: s.events.map((e) => (e.id === id ? { ...e, ...patch } : e)) })),
-      removeEvent: (id) => {
-        const item = get().events.find((e) => e.id === id);
-        if (!item) return;
-        set((s) => ({ events: s.events.filter((e) => e.id !== id) }));
-        get().toast("Event removed", "info", { label: "Undo", run: () => set((s) => ({ events: [...s.events, item] })) });
-      },
-      toggleHabit: (id, day) =>
-        set((s) => ({
-          habits: s.habits.map((h: Habit) => {
-            if (h.id !== id) return h;
-            const week = h.week.map((v, i) => (i === day ? !v : v));
-            return { ...h, week, streak: Math.max(0, h.streak + (week[day] ? 1 : -1)) };
-          }),
-        })),
-
-      launchAgent: (agent, task) => {
-        const id = uid();
-        const def = agentById(agent);
-        set((s) => ({
-          runs: [{ id, agent, task, step: 0, status: "running" as const, at: Date.now() }, ...s.runs].slice(0, 12),
-          launch: { open: false },
-        }));
-        get().toast(`${def.name} is on it`, "info");
-
-        const tick = (step: number) => {
-          if (!get().runs.some((r) => r.id === id)) return;
-          if (step < RUN_STEPS.length) {
-            set((s) => ({ runs: s.runs.map((r) => (r.id === id ? { ...r, step } : r)) }));
-            setTimeout(() => tick(step + 1), 1500);
+        addGoal: (title, area, due) => {
+          const goal = makeGoal(title, area, due);
+          set((s) => ({ goals: [goal, ...s.goals], selectedGoal: goal.id }));
+          return goal.id;
+        },
+        toggleMilestone: (goalId, milestoneId) =>
+          set((s) => ({
+            goals: s.goals.map((g) =>
+              g.id === goalId
+                ? { ...g, milestones: g.milestones.map((m) => (m.id === milestoneId ? { ...m, done: !m.done } : m)) }
+                : g,
+            ),
+          })),
+        scheduleNext: (goalId) => {
+          const goal = get().goals.find((g) => g.id === goalId);
+          const next = goal?.milestones.find((m) => !m.done);
+          if (!goal || !next) return;
+          if (get().priorities.some((p) => p.title === next.title)) {
+            get().toast("That step is already in today's priorities.", "info");
             return;
           }
-          const safe = get().safeMode;
-          const notice: Notice = {
-            id: uid(),
-            title: `${def.name} finished`,
-            detail: safe ? "Result is waiting in Action Center." : task,
-            at: Date.now(),
-            read: false,
-            href: safe ? "/actions" : "/agents",
-          };
-          const action: ActionItem = {
-            id: uid(),
-            title: task.length > 34 ? `${task.slice(0, 32).trimEnd()}...` : task,
-            icon: "file",
-            priority: "Medium",
-            agent,
-            summary: `${def.name} completed "${task}" using your AI Brain context. Approve to apply the result.`,
-            impact: "Prepared by your agent team",
-          };
+          get().addPriority(next.title);
+          get().toast("Added to today's priorities");
+        },
+
+        addEvent: (e) => set((s) => ({ events: [...s.events, { ...e, id: uid() }] })),
+        moveEvent: (id, patch) => set((s) => ({ events: s.events.map((e) => (e.id === id ? { ...e, ...patch } : e)) })),
+        removeEvent: (id) => {
+          const item = get().events.find((e) => e.id === id);
+          if (!item) return;
+          set((s) => ({ events: s.events.filter((e) => e.id !== id) }));
+          get().toast("Event removed", "info", { label: "Undo", run: () => set((s) => ({ events: [...s.events, item] })) });
+        },
+        toggleHabit: (id, day) =>
           set((s) => ({
-            runs: s.runs.map((r) => (r.id === id ? { ...r, status: "done" as const, step: RUN_STEPS.length } : r)),
-            notices: [notice, ...s.notices],
-            actions: safe ? [action, ...s.actions] : s.actions,
-            history: safe
-              ? s.history
-              : [{ id: uid(), title: task, outcome: "approved" as const, agent, at: Date.now() }, ...s.history],
+            habits: s.habits.map((h: Habit) => {
+              if (h.id !== id) return h;
+              const week = h.week.map((v, i) => (i === day ? !v : v));
+              return { ...h, week, streak: Math.max(0, h.streak + (week[day] ? 1 : -1)) };
+            }),
+          })),
+
+        addHabit: (title) =>
+          set((s) => ({ habits: [...s.habits, { id: uid(), title, week: Array(7).fill(false), streak: 0 } satisfies Habit] })),
+
+        launchAgent: (agent, task) => {
+          const id = uid();
+          const def = agentById(agent);
+          set((s) => ({
+            runs: [{ id, agent, task, step: 0, status: "running" as const, at: Date.now() }, ...s.runs].slice(0, 12),
+            launch: { open: false },
           }));
-          get().addMemory({ title: `${def.name}: ${task}`, detail: "Saved from an agent run.", type: "note", area: "Work" });
-          get().toast(safe ? `${def.name} sent a result for review` : `${def.name} finished: ${task}`);
-        };
-        setTimeout(() => tick(1), 1500);
-      },
-      settleRuns: () =>
-        set((s) => ({
-          runs: s.runs.map((r) => (r.status === "running" ? { ...r, status: "done" as const, step: RUN_STEPS.length } : r)),
-        })),
+          get().toast(`${def.name} is on it`, "info");
 
-      toggleApp: (id) => set((s) => ({ apps: { ...s.apps, [id]: !s.apps[id] } })),
-      toggleWorkflow: (id) =>
-        set((s) => ({ workflows: s.workflows.map((w) => (w.id === id ? { ...w, enabled: !w.enabled } : w)) })),
-      runWorkflow: (id) =>
-        set((s) => ({
-          workflows: s.workflows.map((w) => (w.id === id ? { ...w, runs: w.runs + 1, lastRun: Date.now() } : w)),
-        })),
-      addWorkflow: (w) =>
-        set((s) => ({ workflows: [{ ...w, id: uid(), enabled: true, runs: 0, lastRun: "Never" }, ...s.workflows] })),
-
-      markNoticesRead: () => set((s) => ({ notices: s.notices.map((n) => ({ ...n, read: true })) })),
-      pushChat: (m) => set((s) => ({ chat: [...s.chat, m].slice(-MAX_SAVED_MESSAGES) })),
-      appendChat: (id, delta) => set((s) => ({ chat: s.chat.map((m) => (m.id === id ? { ...m, text: m.text + delta } : m)) })),
-      patchChat: (id, patch) => set((s) => ({ chat: s.chat.map((m) => (m.id === id ? { ...m, ...patch } : m)) })),
-      removeChat: (ids) => set((s) => ({ chat: s.chat.filter((m) => !ids.includes(m.id)) })),
-      clearChat: () => set({ chat: [] }),
-
-      togglePermission: (agent, p) =>
-        set((s) => {
-          const has = s.permissions[agent].includes(p);
-          return {
-            permissions: {
-              ...s.permissions,
-              [agent]: has ? s.permissions[agent].filter((x) => x !== p) : [...s.permissions[agent], p],
-            },
+          const tick = (step: number) => {
+            if (!get().runs.some((r) => r.id === id)) return;
+            if (step < RUN_STEPS.length) {
+              set((s) => ({ runs: s.runs.map((r) => (r.id === id ? { ...r, step } : r)) }));
+              setTimeout(() => tick(step + 1), 1500);
+              return;
+            }
+            const safe = get().safeMode;
+            const notice: Notice = {
+              id: uid(),
+              title: `${def.name} finished`,
+              detail: safe ? "Result is waiting in Action Center." : task,
+              at: Date.now(),
+              read: false,
+              href: safe ? "/actions" : "/agents",
+            };
+            const action: ActionItem = {
+              id: uid(),
+              title: task.length > 34 ? `${task.slice(0, 32).trimEnd()}...` : task,
+              icon: "file",
+              priority: "Medium",
+              agent,
+              summary: `${def.name} completed "${task}" using your AI Brain context. Approve to apply the result.`,
+              impact: "Prepared by your agent team",
+            };
+            set((s) => ({
+              runs: s.runs.map((r) => (r.id === id ? { ...r, status: "done" as const, step: RUN_STEPS.length } : r)),
+              notices: [notice, ...s.notices],
+              actions: safe ? [action, ...s.actions] : s.actions,
+              history: safe
+                ? s.history
+                : [{ id: uid(), title: task, outcome: "approved" as const, agent, at: Date.now() }, ...s.history],
+            }));
+            get().addMemory({ title: `${def.name}: ${task}`, detail: "Saved from an agent run.", type: "note", area: "Work" });
+            get().toast(safe ? `${def.name} sent a result for review` : `${def.name} finished: ${task}`);
           };
-        }),
-      setProfile: (p) => set((s) => ({ profile: { ...s.profile, ...p } })),
-      setPrefs: (p) => set((s) => ({ prefs: { ...s.prefs, ...p } })),
-      setPrivacy: (p) => set((s) => ({ privacy: { ...s.privacy, ...p } })),
-      setPill: (key, value) => set({ [key]: value } as Pick<Store, typeof key>),
-      setTourDone: (done) => set({ tourDone: done }),
-      resetDemo: () => {
-        const name = get().account?.name;
-        set(seed());
-        if (name) get().setProfile({ name });
-      },
-    }),
+          setTimeout(() => tick(1), 1500);
+        },
+        settleRuns: () =>
+          set((s) => ({
+            runs: s.runs.map((r) => (r.status === "running" ? { ...r, status: "done" as const, step: RUN_STEPS.length } : r)),
+          })),
+
+        toggleApp: (id) => set((s) => ({ apps: { ...s.apps, [id]: !s.apps[id] } })),
+        toggleWorkflow: (id) =>
+          set((s) => ({ workflows: s.workflows.map((w) => (w.id === id ? { ...w, enabled: !w.enabled } : w)) })),
+        runWorkflow: (id) =>
+          set((s) => ({
+            workflows: s.workflows.map((w) => (w.id === id ? { ...w, runs: w.runs + 1, lastRun: Date.now() } : w)),
+          })),
+        addWorkflow: (w) =>
+          set((s) => ({ workflows: [{ ...w, id: uid(), enabled: true, runs: 0, lastRun: "Never" }, ...s.workflows] })),
+
+        markNoticesRead: () => set((s) => ({ notices: s.notices.map((n) => ({ ...n, read: true })) })),
+        pushChat: (m) => set((s) => ({ chat: [...s.chat, m].slice(-MAX_SAVED_MESSAGES) })),
+        appendChat: (id, delta) => set((s) => ({ chat: s.chat.map((m) => (m.id === id ? { ...m, text: m.text + delta } : m)) })),
+        patchChat: (id, patch) => set((s) => ({ chat: s.chat.map((m) => (m.id === id ? { ...m, ...patch } : m)) })),
+        removeChat: (ids) => set((s) => ({ chat: s.chat.filter((m) => !ids.includes(m.id)) })),
+        clearChat: () => set({ chat: [] }),
+
+        togglePermission: (agent, p) =>
+          set((s) => {
+            const has = s.permissions[agent].includes(p);
+            return {
+              permissions: {
+                ...s.permissions,
+                [agent]: has ? s.permissions[agent].filter((x) => x !== p) : [...s.permissions[agent], p],
+              },
+            };
+          }),
+        setProfile: (p) => set((s) => ({ profile: { ...s.profile, ...p } })),
+        setPrefs: (p) => set((s) => ({ prefs: { ...s.prefs, ...p } })),
+        setPrivacy: (p) => set((s) => ({ privacy: { ...s.privacy, ...p } })),
+        setPill: (key, value) => set({ [key]: value } as Pick<Store, typeof key>),
+        setTourDone: (done) => set({ tourDone: done }),
+        loadSample: () => replaceWorkspace(seed()),
+        clearWorkspace: () => replaceWorkspace(emptyWorkspace()),
+      };
+    },
     {
       name: "nexus-os-v1",
       skipHydration: true,

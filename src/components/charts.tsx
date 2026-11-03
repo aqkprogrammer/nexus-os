@@ -44,7 +44,8 @@ export function AreaChart({
   const line = smoothPath(points);
   const area = `${line} L${W} ${H} L0 ${H} Z`;
 
-  const ticks = axis ? [0, 0.5, 1].map((t) => Math.round(max * t)) : [];
+  // An empty chart rounds every tick to 0, so duplicates are dropped.
+  const ticks = axis ? [...new Set([0, 0.5, 1].map((t) => Math.round(max * t)))] : [];
   const last = points[points.length - 1];
   const active = hover ?? data.length - 1;
 

@@ -35,6 +35,8 @@ function RunRow({ run }: { run: AgentRun }) {
 
 export default function AgentsPage() {
   const runs = useStore((s) => s.runs);
+  // Only the sample comes with a history of earlier runs.
+  const baseRuns: Record<string, number> = useStore((s) => s.sample) ? BASE_RUNS : {};
   const pending = useStore((s) => s.actions.length);
   const permissions = useStore((s) => s.permissions);
   const setUi = useStore((s) => s.setUi);
@@ -44,7 +46,7 @@ export default function AgentsPage() {
 
   const running = runs.filter((r) => r.status === "running");
   const busy = new Set(running.map((r) => r.agent));
-  const totalRuns = Object.values(BASE_RUNS).reduce((a, b) => a + b, 0) + runs.length;
+  const totalRuns = Object.values(baseRuns).reduce((a, b) => a + b, 0) + runs.length;
 
   return (
     <Page
@@ -85,7 +87,7 @@ export default function AgentsPage() {
               </div>
               <div className="mt-3 text-[0.9375rem] font-semibold">{a.name}</div>
               <div className="text-xs text-fg-2">{a.desc}</div>
-              <div className="mt-2.5 text-[0.6875rem] text-fg-3">{(BASE_RUNS[a.id] ?? 0) + runs.filter((r) => r.agent === a.id).length} runs</div>
+              <div className="mt-2.5 text-[0.6875rem] text-fg-3">{(baseRuns[a.id] ?? 0) + runs.filter((r) => r.agent === a.id).length} runs</div>
             </motion.button>
           ))}
         </section>
