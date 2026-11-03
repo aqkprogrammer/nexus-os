@@ -43,7 +43,12 @@ test("devices that unsubscribed are forgotten", async ({ context }) => {
   expect(await send()).toEqual({ sent: 0 });
 });
 
-test("Settings offers push notifications for this device", async ({ page }) => {
-  await page.goto("/settings");
-  await expect(page.getByRole("switch", { name: "Push notifications" }).or(page.getByText("Not supported in this browser"))).toBeVisible();
+test.describe("with notifications allowed", () => {
+  // Headless browsers block notifications by default, which Settings reports as blocked.
+  test.use({ permissions: ["notifications"] });
+
+  test("Settings offers push notifications for this device", async ({ page }) => {
+    await page.goto("/settings");
+    await expect(page.getByRole("switch", { name: "Push notifications" })).toHaveAttribute("aria-checked", "false");
+  });
 });

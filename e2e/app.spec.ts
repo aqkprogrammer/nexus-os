@@ -60,6 +60,8 @@ test("changes survive a reload", async ({ page }) => {
 
 test("the search palette opens from the keyboard and navigates", async ({ page }) => {
   await page.goto("/");
+  // The shortcut listens once the workspace has loaded.
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await page.keyboard.press("ControlOrMeta+k");
   await page.getByPlaceholder("Search pages, agents, goals, memories...").fill("Life Planner");
   await page.keyboard.press("Enter");
