@@ -6,7 +6,7 @@ Your personal AI operating system. One intelligent workspace that understands yo
 
 ![NEXUS OS dashboard](docs/screenshots/dashboard.png)
 
-This repository is the complete frontend, plus a real AI chat endpoint. Workspace data is seeded and saved in the browser until the database exists. The GitHub Pages demo has no server, so its chat uses built-in demo replies.
+This repository is the complete frontend, plus accounts, a Postgres database and a real AI chat endpoint. The GitHub Pages demo has no server, so it has no login, keeps data in your browser and uses built-in demo replies.
 
 ## Screenshots
 
@@ -32,12 +32,37 @@ This repository is the complete frontend, plus a real AI chat endpoint. Workspac
 
 ## Run it
 
-```bash
-npm install
-npm run dev
-```
+You need Node.js and a running Postgres server.
 
-Then open http://localhost:3000.
+1. Install the packages and copy the settings template:
+
+   ```bash
+   npm install
+   ```
+
+   ```bash
+   cp .env.example .env.local
+   ```
+
+2. Fill in `DATABASE_URL`, `BETTER_AUTH_SECRET` and `ALLOWED_EMAILS` in `.env.local`.
+
+3. Create the database and its tables:
+
+   ```bash
+   createdb nexus_os
+   ```
+
+   ```bash
+   npm run db:deploy
+   ```
+
+4. Start the app:
+
+   ```bash
+   npm run dev
+   ```
+
+Then open http://localhost:3000 and create an account with an email from `ALLOWED_EMAILS`.
 
 | Script | Purpose |
 | --- | --- |
@@ -46,36 +71,52 @@ Then open http://localhost:3000.
 | `npm start` | Run the production build |
 | `npm run typecheck` | TypeScript check |
 | `npm test` | Browser tests with Playwright |
+| `npm run db:migrate` | Create a migration after changing `prisma/schema.prisma` |
+| `npm run db:deploy` | Apply migrations to a database |
 
 ## Testing
 
-`npm test` builds the app and drives it in a real browser, covering the main flows on desktop and every page at phone size. Chat runs through the real endpoint against a small mock in `e2e/mock-openai.mjs`, so tests are free and need no key. Local runs use your installed Chrome.
+`npm test` builds the app and drives it in a real browser, covering the main flows on desktop and every page at phone size. Each test signs in to a fresh account. Chat runs through the real endpoint against a small mock in `e2e/mock-openai.mjs`, so tests are free and need no key. Local runs use your installed Chrome.
+
+The tests need a separate database, which they migrate themselves:
+
+```bash
+createdb nexus_os_test
+```
+
+They connect as your system user. Set `TEST_DATABASE_URL` to use a different connection.
 
 Every push to `main` runs the same tests, and a failure stops the deploy.
+
+## Accounts and data
+
+Sign-in uses email and password through [Better Auth](https://www.better-auth.com). Passwords are hashed, and repeated attempts are rate limited.
+
+- **Sign-up is invite-only.** Only emails in `ALLOWED_EMAILS` can create an account, so a public deployment can't be used to spend your OpenAI credit.
+- **Each account has its own workspace.** It is saved to Postgres shortly after every change, and nothing personal stays in the browser.
+- **New accounts start with the sample data,** so the app has something to show before integrations exist.
+- **Two open tabs can't silently overwrite each other.** A save from an out-of-date tab is refused, and that tab reloads the newer workspace and says so.
+- **There is no password reset or email verification yet.** Both need an email provider.
+
+The API routes check the session on every request. `src/proxy.ts` only redirects signed-out visitors, so it is not what protects the data.
 
 ## Real AI chat
 
 The companion streams replies from OpenAI, answers from your workspace data, and can add tasks, save memories, schedule events, create goals and launch agents.
 
-1. Copy the template:
-
-   ```bash
-   cp .env.example .env.local
-   ```
-
-2. Add your key to `OPENAI_API_KEY` in `.env.local`, then restart `npm run dev`.
+Add your key to `OPENAI_API_KEY` in `.env.local`, then restart `npm run dev`.
 
 Without a key, the chat falls back to demo replies and says so under its name. `OPENAI_MODEL` selects any Responses API model.
 
 **Privacy:** each message sends a snapshot of the workspace to OpenAI, including tasks, calendar, goals and up to 40 memories. Requests use `store: false`.
 
-**Cost control:** the endpoint checks the request origin, allows 15 requests a minute per IP address, and caps message size and reply length. The rate limit is per server instance, so set a monthly spend limit in your OpenAI account before deploying publicly. There is no login yet, so anyone with the URL can use your key through the chat.
+**Cost control:** the endpoint requires a signed-in user, checks the request origin, allows 15 requests a minute per user, and caps message size and reply length. The chat rate limit is per server instance, so set a monthly spend limit in your OpenAI account before deploying.
 
 ## Deployment
 
-**Real AI:** deploy to a Node host such as Vercel and set `OPENAI_API_KEY` in its environment variables. Never commit the key.
+**Full app:** deploy to a Node host such as Vercel with a hosted Postgres database. Set every variable from `.env.example` in the host's settings, with `BETTER_AUTH_URL` set to the deployed address, and run `npm run db:deploy` against that database. Never commit secrets.
 
-**Demo:** every push to `main` runs `.github/workflows/deploy.yml`, which tests the app, then publishes a static build to GitHub Pages. Setting `PAGES_BASE_PATH` selects that build and leaves out the API. Setting `SITE_URL` makes the link preview image use a full URL.
+**Demo:** every push to `main` runs `.github/workflows/deploy.yml`, which tests the app, then publishes a static build to GitHub Pages. Setting `PAGES_BASE_PATH` selects that build and leaves out the API and login. Setting `SITE_URL` makes the link preview image use a full URL.
 
 ## Modules
 
@@ -102,22 +143,28 @@ src/components/ui.tsx  Cards, buttons, toggles, modals, toasts
 src/components/charts.tsx  Area, stacked bar and heatmap charts
 src/components/Mascot.tsx  Animated SVG mascot
 src/lib/data.ts        Types and seed data
-src/lib/store.ts       App state, persisted to localStorage
+src/lib/store.ts       App state
+src/lib/workspace-sync.ts  Loads and saves the workspace through the API
+src/lib/auth.ts        Better Auth setup and the sign-up invite list
+src/lib/db.ts          Prisma client
 src/lib/companion.ts   Demo replies used when no model is available
 src/lib/chat-*.ts      Chat client, workspace context and tool definitions
 src/app/api/chat/      Streaming OpenAI endpoint
+src/app/api/workspace/ Reads and saves the signed-in user's workspace
+src/app/login/         Sign in and create account
+prisma/                Database schema and migrations
 ```
 
 ## Connecting the backend
 
-Chat is already real. The rest of the interface is ready for the stack below, and each remaining piece is simulated in one place, so it can be swapped without touching the screens.
+Chat, accounts and saved workspaces are already real. The rest of the interface is ready for the stack below, and each remaining piece is simulated in one place, so it can be swapped without touching the screens.
 
 | Replace | With |
 | --- | --- |
 | `draftPlan` in `src/lib/store.ts` | A goal-planning model call |
 | `launchAgent` in `src/lib/store.ts` | The LangGraph execution engine |
 | `runWorkflow` and `toggleApp` in `src/lib/store.ts` | Redis queues and MCP connectors |
-| Seed data in `src/lib/data.ts` | PostgreSQL and pgvector through the API |
+| Seed data in `src/lib/data.ts` | Real data from integrations, with pgvector for memory search |
 
 | Layer | Technology |
 | --- | --- |

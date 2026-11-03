@@ -1,11 +1,19 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { Bell, ChevronDown, LockKeyhole, Menu, Search, Settings, ShieldCheck, Sparkles, Target, UserRound } from "lucide-react";
+import { Bell, ChevronDown, LockKeyhole, LogOut, Menu, Search, Settings, ShieldCheck, Sparkles, Target, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { authClient } from "@/lib/auth-client";
 import { useStore } from "@/lib/store";
 import { cn, timeAgo } from "@/lib/utils";
+import { saveWorkspace } from "@/lib/workspace-sync";
+
+async function signOut() {
+  await saveWorkspace();
+  await authClient.signOut();
+  window.location.assign("/login");
+}
 
 function useDismiss(open: boolean, close: () => void) {
   const ref = useRef<HTMLDivElement>(null);
@@ -77,6 +85,7 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
   const safeMode = useStore((s) => s.safeMode);
   const notices = useStore((s) => s.notices);
   const profile = useStore((s) => s.profile);
+  const account = useStore((s) => s.account);
   const setPill = useStore((s) => s.setPill);
   const setUi = useStore((s) => s.setUi);
   const toast = useStore((s) => s.toast);
@@ -222,6 +231,7 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
           <AnimatePresence>
             {userOpen && (
               <Popover className="w-56 p-1.5">
+                {account && <p className="truncate px-2.5 pt-1.5 pb-2 text-xs text-fg-3">{account.email}</p>}
                 {[
                   { href: "/settings", label: "Profile & settings", icon: UserRound },
                   { href: "/goals", label: "My goals", icon: Target },
@@ -234,6 +244,12 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
                     {i.label}
                   </Link>
                 ))}
+                {account && (
+                  <button type="button" onClick={() => void signOut()} className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-[0.8125rem] text-fg-2 hover:bg-white/6 hover:text-fg">
+                    <LogOut className="size-4" strokeWidth={1.7} />
+                    Sign out
+                  </button>
+                )}
               </Popover>
             )}
           </AnimatePresence>

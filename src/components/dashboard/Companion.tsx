@@ -7,9 +7,9 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Mascot } from "@/components/Mascot";
 import { enter } from "@/components/ui";
-import { isStaticDemo, retryChat, sendChat, stopChat } from "@/lib/chat-client";
+import { retryChat, sendChat, stopChat } from "@/lib/chat-client";
 import { useStore, type ChatMessage } from "@/lib/store";
-import { cn } from "@/lib/utils";
+import { cn, isStaticDemo } from "@/lib/utils";
 
 const CHIPS = [
   { label: "What's on my agenda?", icon: CalendarDays, color: "#c4a5ff" },

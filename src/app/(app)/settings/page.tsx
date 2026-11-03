@@ -132,7 +132,7 @@ export default function SettingsPage() {
               <Compass className="size-4" /> Replay tour
             </Btn>
             <Btn tone="rose" onClick={() => setConfirming(true)}>
-              <RotateCcw className="size-4" /> Reset demo data
+              <RotateCcw className="size-4" /> Reset to sample data
             </Btn>
           </div>
         </Card>
@@ -158,7 +158,7 @@ export default function SettingsPage() {
         </Card>
       </div>
 
-      <Modal open={confirming} onClose={() => setConfirming(false)} title="Reset demo data?" subtitle="This restores the original priorities, memories, goals and settings.">
+      <Modal open={confirming} onClose={() => setConfirming(false)} title="Reset to sample data?" subtitle="This replaces your priorities, memories, goals and settings with the sample data. It can't be undone.">
         <div className="mt-5 flex justify-end gap-2">
           <Btn tone="ghost" onClick={() => setConfirming(false)}>
             Cancel
@@ -168,7 +168,7 @@ export default function SettingsPage() {
             onClick={() => {
               resetDemo();
               setConfirming(false);
-              toast("Demo data restored");
+              toast("Sample data restored");
             }}
           >
             Reset

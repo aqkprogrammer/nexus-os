@@ -8,22 +8,38 @@ import { GlobalModals } from "@/components/shell/GlobalModals";
 import { Sidebar } from "@/components/shell/Sidebar";
 import { Tour } from "@/components/shell/Tour";
 import { Topbar } from "@/components/shell/Topbar";
-import { Toaster } from "@/components/ui";
+import { Btn, Toaster } from "@/components/ui";
 import { useStore } from "@/lib/store";
+import { isStaticDemo } from "@/lib/utils";
+import { loadWorkspace, startSync } from "@/lib/workspace-sync";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const [navOpen, setNavOpen] = useState(false);
   const pathname = usePathname();
   const motionOn = useStore((s) => s.prefs.motion);
-  const [ready, setReady] = useState(false);
+  const [status, setStatus] = useState<"loading" | "ready" | "failed">("loading");
+  const ready = status === "ready";
 
-  // Saved state lives in localStorage, so the app waits for it instead of flashing seed data.
+  // The app waits for saved state instead of flashing seed data, and never saves over it after a failed load.
   useEffect(() => {
-    void Promise.resolve(useStore.persist.rehydrate()).then(() => {
-      useStore.getState().settleRuns();
-      setReady(true);
-    });
-  }, []);
+    if (status !== "loading") return;
+    let active = true;
+    const load = isStaticDemo ? Promise.resolve(useStore.persist.rehydrate()).then(() => true) : loadWorkspace();
+    load
+      .then((loaded) => {
+        if (!active || !loaded) return;
+        useStore.getState().settleRuns();
+        setStatus("ready");
+      })
+      .catch(() => active && setStatus("failed"));
+    return () => {
+      active = false;
+    };
+  }, [status]);
+
+  useEffect(() => {
+    if (ready && !isStaticDemo) return startSync();
+  }, [ready]);
 
   useEffect(() => {
     document.documentElement.dataset.motion = motionOn ? "on" : "off";
@@ -43,6 +59,16 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <MotionConfig reducedMotion={motionOn ? "user" : "always"}>
       <div className="nx-backdrop" aria-hidden />
+      {status === "failed" && (
+        <div role="alert" className="grid h-dvh place-items-center p-4 text-center">
+          <div>
+            <p className="text-sm text-fg-2">We couldn&apos;t load your workspace. Your data is safe.</p>
+            <Btn className="mt-3" onClick={() => setStatus("loading")}>
+              Try again
+            </Btn>
+          </div>
+        </div>
+      )}
       {ready && (
         <div className="flex h-dvh">
           <div className="hidden w-[16.6rem] shrink-0 xl:block">

@@ -1,6 +1,8 @@
 import OpenAI from "openai";
 import type { ResponseInputItem } from "openai/resources/responses/responses";
+import { currentUser } from "@/lib/auth";
 import { CHAT_TOOLS, parseToolCall, type ChatEvent } from "@/lib/chat-tools";
+import { sameOrigin } from "@/lib/request";
 
 const MODEL = process.env.OPENAI_MODEL || "gpt-6-astra";
 const MAX_MESSAGES = 24;
@@ -14,27 +16,16 @@ const RATE_WINDOW_MS = 60_000;
 /** Per-instance, so it slows abuse rather than guaranteeing a limit. Set a spend cap at OpenAI too. */
 const recent = new Map<string, number[]>();
 
-function rateLimited(ip: string) {
+function rateLimited(userId: string) {
   const now = Date.now();
-  const hits = (recent.get(ip) ?? []).filter((t) => now - t < RATE_WINDOW_MS);
+  const hits = (recent.get(userId) ?? []).filter((t) => now - t < RATE_WINDOW_MS);
   if (hits.length >= RATE_LIMIT) {
-    recent.set(ip, hits);
+    recent.set(userId, hits);
     return true;
   }
-  recent.set(ip, [...hits, now]);
+  recent.set(userId, [...hits, now]);
   if (recent.size > 5000) recent.clear();
   return false;
-}
-
-function sameOrigin(req: Request) {
-  const origin = req.headers.get("origin");
-  if (!origin) return false;
-  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
-  try {
-    return new URL(origin).host === host;
-  } catch {
-    return false;
-  }
 }
 
 interface ChatRequest {
@@ -86,11 +77,13 @@ ${JSON.stringify(context)}
 }
 
 export async function POST(req: Request) {
-  if (!process.env.OPENAI_API_KEY) return Response.json({ error: "not_configured" }, { status: 503 });
   if (!sameOrigin(req)) return Response.json({ error: "forbidden" }, { status: 403 });
 
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || "local";
-  if (rateLimited(ip)) return Response.json({ error: "rate_limited" }, { status: 429 });
+  const user = await currentUser(req);
+  if (!user) return Response.json({ error: "unauthorized" }, { status: 401 });
+
+  if (!process.env.OPENAI_API_KEY) return Response.json({ error: "not_configured" }, { status: 503 });
+  if (rateLimited(user.id)) return Response.json({ error: "rate_limited" }, { status: 429 });
 
   const body = parseBody(await req.json().catch(() => null));
   if (!body) return Response.json({ error: "invalid_request" }, { status: 400 });

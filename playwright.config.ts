@@ -1,11 +1,13 @@
+import { userInfo } from "node:os";
 import { defineConfig, devices } from "@playwright/test";
 
 const PORT = 3210;
 const MOCK_PORT = 3299;
+const DATABASE_URL = process.env.TEST_DATABASE_URL ?? `postgresql://${userInfo().username}@localhost:5432/nexus_os_test`;
 
 export default defineConfig({
   testDir: "e2e",
-  // Tests share one rate-limited chat endpoint, so they run one at a time.
+  // One at a time, so timing-sensitive tests don't compete for the same server.
   workers: 1,
   retries: process.env.CI ? 1 : 0,
   forbidOnly: !!process.env.CI,
@@ -28,11 +30,18 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
     },
     {
-      command: `npm run build && npx next start --port ${PORT}`,
+      command: `npx prisma migrate deploy && npm run build && npx next start --port ${PORT}`,
       url: `http://localhost:${PORT}`,
       timeout: 180_000,
       reuseExistingServer: !process.env.CI,
-      env: { OPENAI_API_KEY: "test-key", OPENAI_BASE_URL: `http://127.0.0.1:${MOCK_PORT}/v1` },
+      env: {
+        OPENAI_API_KEY: "test-key",
+        OPENAI_BASE_URL: `http://127.0.0.1:${MOCK_PORT}/v1`,
+        DATABASE_URL,
+        BETTER_AUTH_URL: `http://localhost:${PORT}`,
+        BETTER_AUTH_SECRET: "test-only-secret-that-is-at-least-32-chars",
+        ALLOWED_EMAILS: "@nexus.test",
+      },
     },
   ],
 });

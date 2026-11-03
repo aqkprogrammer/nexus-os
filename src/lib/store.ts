@@ -1,7 +1,7 @@
 "use client";
 
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { createJSONStorage, persist, type StateStorage } from "zustand/middleware";
 import {
   agentById,
   RUN_STEPS,
@@ -33,7 +33,7 @@ import {
   type Priority,
   type Workflow,
 } from "./data";
-import { uid } from "./utils";
+import { isStaticDemo, uid } from "./utils";
 
 export interface ChatMessage {
   id: string;
@@ -65,6 +65,11 @@ interface Profile {
   companionTone: "Warm" | "Direct" | "Playful";
 }
 
+interface Account {
+  name: string;
+  email: string;
+}
+
 interface Prefs {
   ambient: boolean;
   motion: boolean;
@@ -83,6 +88,9 @@ const SEED_CHAT: ChatMessage[] = [];
 const MAX_SAVED_MESSAGES = 60;
 const TOAST_MS = 3600;
 const UNDO_TOAST_MS = 7000;
+
+/** Signed-in workspaces live in the database, so nothing personal is left in the browser. */
+const noStorage: StateStorage = { getItem: () => null, setItem: () => {}, removeItem: () => {} };
 
 function reinsert<T>(list: T[], item: T, index: number) {
   const next = [...list];
@@ -116,6 +124,7 @@ const seed = () => ({
 
 export interface Store extends ReturnType<typeof seed> {
   /* Transient UI, never persisted */
+  account: Account | null;
   toasts: Toast[];
   launch: { open: boolean; agent?: AgentId; task?: string };
   reviewing: string | null;
@@ -202,11 +211,19 @@ const makeGoal = (title: string, area: string, due: string): Goal => ({
   milestones: draftPlan(title).map((t) => ({ id: uid(), title: t, done: false })),
 });
 
+/** The part of the store that belongs to the user, leaving out transient UI. */
+export function savedState(s: Store) {
+  const { account, toasts, launch, reviewing, briefOpen, paletteOpen, chatExpanded, chatStatus, chatMode, selectedGoal, ...rest } = s;
+  void account, toasts, launch, reviewing, briefOpen, paletteOpen, chatExpanded, chatStatus, chatMode, selectedGoal;
+  return rest;
+}
+
 export const useStore = create<Store>()(
   persist(
     (set, get) => ({
       ...seed(),
 
+      account: null,
       toasts: [],
       launch: { open: false },
       reviewing: null,
@@ -426,16 +443,17 @@ export const useStore = create<Store>()(
       setPrivacy: (p) => set((s) => ({ privacy: { ...s.privacy, ...p } })),
       setPill: (key, value) => set({ [key]: value } as Pick<Store, typeof key>),
       setTourDone: (done) => set({ tourDone: done }),
-      resetDemo: () => set(seed()),
+      resetDemo: () => {
+        const name = get().account?.name;
+        set(seed());
+        if (name) get().setProfile({ name });
+      },
     }),
     {
       name: "nexus-os-v1",
       skipHydration: true,
-      partialize: (s) => {
-        const { toasts, launch, reviewing, briefOpen, paletteOpen, chatExpanded, chatStatus, chatMode, selectedGoal, ...rest } = s;
-        void toasts, launch, reviewing, briefOpen, paletteOpen, chatExpanded, chatStatus, chatMode, selectedGoal;
-        return rest;
-      },
+      storage: createJSONStorage(() => (isStaticDemo ? localStorage : noStorage)),
+      partialize: savedState,
     },
   ),
 );

@@ -1,3 +1,6 @@
+/** The GitHub Pages build has no server, so it uses demo replies and browser storage, with no accounts. */
+export const isStaticDemo = process.env.NEXT_PUBLIC_STATIC_DEMO === "1";
+
 export function cn(...parts: (string | false | null | undefined)[]) {
   return parts.filter(Boolean).join(" ");
 }
