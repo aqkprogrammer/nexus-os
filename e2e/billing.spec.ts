@@ -39,7 +39,7 @@ test("upgrading goes to Stripe Checkout, and Stripe's confirmation turns on Pro"
     `select b."customerId", b."userId" from billing b join "user" u on u.id = b."userId" where u.email = $1`,
     [email],
   );
-  expect((await stripeEvent(page, "checkout.session.completed", { id: "cs_1", object: "checkout.session", customer: customerId, client_reference_id: userId, subscription: "sub_1" })).status()).toBe(200);
+  expect((await stripeEvent(page, "checkout.session.completed", { id: "cs_1", object: "checkout.session", customer: customerId, client_reference_id: userId, subscription: "sub_1", payment_status: "paid" })).status()).toBe(200);
 
   await page.goto("/settings");
   await expect(planCard(page)).toContainText("Nexus Pro");
@@ -60,6 +60,51 @@ test("upgrading goes to Stripe Checkout, and Stripe's confirmation turns on Pro"
   await stripeEvent(page, "customer.subscription.deleted", subscription("canceled"));
   await page.reload();
   await expect(planCard(page).getByRole("button", { name: "Upgrade to Pro" })).toBeVisible();
+});
+
+async function customerOf(email: string) {
+  const [row] = await sql<{ customerId: string; userId: string }>(`select b."customerId", b."userId" from billing b join "user" u on u.id = b."userId" where u.email = $1`, [email]);
+  return row;
+}
+
+async function startCheckout(page: Page) {
+  await page.route("https://checkout.stripe.test/**", (route) => route.fulfill({ body: "Stripe Checkout" }));
+  await planCard(page).getByRole("button", { name: "Upgrade to Pro" }).click();
+  await expect(page).toHaveURL(/checkout\.stripe\.test/);
+}
+
+const sub = (id: string, customer: string, status: string) => ({ id, object: "subscription", customer, status, items: { object: "list", data: [] } });
+
+test("an old subscription ending doesn't cancel a newer one", async ({ context, page }) => {
+  const email = await freeAccount(context, page);
+  await startCheckout(page);
+  const { customerId } = await customerOf(email);
+
+  await stripeEvent(page, "customer.subscription.updated", sub("sub_old", customerId, "active"));
+  await stripeEvent(page, "customer.subscription.created", sub("sub_new", customerId, "active"));
+  await stripeEvent(page, "customer.subscription.deleted", sub("sub_old", customerId, "canceled"));
+
+  await page.goto("/settings");
+  await expect(planCard(page)).toContainText("Nexus Pro");
+});
+
+test("a payment that hasn't cleared doesn't turn on Pro", async ({ context, page }) => {
+  const email = await freeAccount(context, page);
+  await startCheckout(page);
+  const { customerId, userId } = await customerOf(email);
+  await stripeEvent(page, "checkout.session.completed", { id: "cs_2", object: "checkout.session", customer: customerId, client_reference_id: userId, subscription: "sub_2", payment_status: "unpaid" });
+
+  await page.goto("/settings");
+  await expect(planCard(page).getByRole("button", { name: "Upgrade to Pro" })).toBeVisible();
+});
+
+test("rejected AI requests don't use up the allowance", async ({ context, page }) => {
+  await freeAccount(context, page);
+  for (let i = 0; i < 4; i++) {
+    const res = await context.request.post("/api/capture", { headers: { origin: ORIGIN }, data: { text: "" } });
+    expect(res.status()).toBe(400);
+  }
+  await expect.poll(async () => (await (await context.request.get("/api/billing")).json()).used).toBe(0);
 });
 
 test("events without Stripe's signature are refused", async ({ context, page }) => {

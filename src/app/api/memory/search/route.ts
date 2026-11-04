@@ -6,7 +6,7 @@ const MAX_QUERY = 300;
 /** Finds memories by meaning. Without AI, AI Brain falls back to matching words. */
 export async function POST(req: Request) {
   // Search is cheap, so it doesn't use up the plan's daily AI allowance.
-  const { user, error } = await aiRequest(req, "memory-search", 30, false);
+  const { user, error } = await aiRequest(req, "memory-search", 30);
   if (error) return error;
 
   const { q } = ((await req.json().catch(() => null)) ?? {}) as { q?: unknown };

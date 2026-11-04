@@ -4,6 +4,30 @@ import { dailyDigest, localTime, weeklyDigest, type DigestState } from "@/lib/di
 import { emailConfigured, sendEmail, type Email } from "@/lib/email";
 
 const DAILY_HOUR = 7;
+const BATCH = 200;
+
+/**
+ * Confirmed addresses that have a summary turned on, a batch at a time, so memory stays flat as accounts grow.
+ * Confirmed only, so a mistyped email at sign-up never gets someone else's summaries.
+ */
+async function* wantingSummaries() {
+  let cursor: string | undefined;
+  for (;;) {
+    const page = await prisma.workspace.findMany({
+      where: {
+        user: { emailVerified: true },
+        OR: [{ state: { path: ["prefs", "emailDigest"], equals: true } }, { state: { path: ["prefs", "weeklyReview"], equals: true } }],
+      },
+      select: { userId: true, state: true, user: { select: { email: true } } },
+      orderBy: { userId: "asc" },
+      take: BATCH,
+      ...(cursor && { cursor: { userId: cursor }, skip: 1 }),
+    });
+    yield* page;
+    if (page.length < BATCH) return;
+    cursor = page[page.length - 1].userId;
+  }
+}
 const WEEKLY_HOUR = 18;
 const SUNDAY = 6;
 
@@ -27,15 +51,10 @@ export async function GET(req: Request) {
   if (Number.isNaN(now.getTime())) return Response.json({ error: "invalid_request" }, { status: 400 });
   const appUrl = process.env.BETTER_AUTH_URL ?? new URL(req.url).origin;
 
-  // Only confirmed addresses, so a mistyped email at sign-up never gets someone else's summaries.
-  const workspaces = await prisma.workspace.findMany({
-    where: { user: { emailVerified: true } },
-    select: { userId: true, state: true, user: { select: { email: true } } },
-  });
   let sent = 0;
   let failed = 0;
 
-  for (const w of workspaces) {
+  for await (const w of wantingSummaries()) {
     const state = (w.state ?? {}) as DigestState;
     if (state.sample) continue;
     const local = localTime(now, state.timezone);

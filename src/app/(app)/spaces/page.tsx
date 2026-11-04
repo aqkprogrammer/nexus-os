@@ -176,11 +176,7 @@ function Goals({ space, items, onChange }: { space: Space; items: Item[]; onChan
                       <Check3
                         on={m.done}
                         label={m.title}
-                        onChange={() =>
-                          void save(() =>
-                            api(`/api/spaces/${space.id}/items/${g.id}`, "PATCH", { data: { ...g.data, milestones: g.data.milestones.map((x) => (x.id === m.id ? { ...x, done: !x.done } : x)) } }),
-                          )
-                        }
+                        onChange={() => void save(() => api(`/api/spaces/${space.id}/items/${g.id}`, "PATCH", { milestone: m.id, done: !m.done }))}
                       />
                     ) : (
                       <span className={cn("size-2 rounded-full", m.done ? "bg-nx-green" : "bg-white/20")} />

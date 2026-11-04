@@ -20,13 +20,15 @@ const text = (v: unknown) => typeof v === "string" && v.trim().length > 0 && v.l
 
 /** Writes a milestone plan for a goal from the user's calendar and other goals. */
 export async function POST(req: Request) {
-  const { error } = await aiRequest(req, "plan", 10);
+  const { error, spend } = await aiRequest(req, "plan", 10);
   if (error) return error;
 
   const { title, area, due, context } = ((await req.json().catch(() => null)) ?? {}) as Record<string, unknown>;
   if (!text(title) || !text(area) || !text(due)) return Response.json({ error: "invalid_request" }, { status: 400 });
   const data = JSON.stringify(context ?? {});
   if (data.length > MAX_CONTEXT_CHARS) return Response.json({ error: "invalid_request" }, { status: 400 });
+  const limited = await spend();
+  if (limited) return limited;
 
   try {
     const plan = await askJson<GoalPlan>(

@@ -10,7 +10,12 @@ function periodEnd(sub: Stripe.Subscription) {
 
 async function applySubscription(sub: Stripe.Subscription) {
   const customerId = typeof sub.customer === "string" ? sub.customer : sub.customer.id;
-  await prisma.billing.updateMany({
+  const billing = await prisma.billing.findUnique({ where: { customerId } });
+  if (!billing) return;
+  // Another subscription only takes over once it's paid for, so an old one ending can't cancel a newer one.
+  const current = !billing.subscriptionId || billing.subscriptionId === sub.id;
+  if (!current && planFor(sub.status) !== "pro") return;
+  await prisma.billing.update({
     where: { customerId },
     data: { subscriptionId: sub.id, status: sub.status, plan: planFor(sub.status), currentPeriodEnd: periodEnd(sub) },
   });
@@ -32,10 +37,12 @@ export async function POST(req: Request) {
       const session = event.data.object;
       const customerId = typeof session.customer === "string" ? session.customer : session.customer?.id;
       if (!customerId || !session.client_reference_id) break;
-      // Pro starts as soon as the payment goes through. The subscription events that follow fill in the details.
+      const subscriptionId = typeof session.subscription === "string" ? session.subscription : (session.subscription?.id ?? null);
+      // Pro starts as soon as the payment has cleared. A slower payment, like a bank debit, waits for Stripe's subscription events.
+      const paid = session.payment_status === "paid" || session.payment_status === "no_payment_required";
       await prisma.billing.updateMany({
         where: { customerId, userId: session.client_reference_id },
-        data: { plan: "pro", status: "active", subscriptionId: typeof session.subscription === "string" ? session.subscription : (session.subscription?.id ?? null) },
+        data: paid ? { plan: "pro", status: "active", subscriptionId } : { subscriptionId },
       });
       break;
     }

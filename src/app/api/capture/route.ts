@@ -20,11 +20,13 @@ const SCHEMA = {
 
 /** Sorts a quick note into a task, memory, event or idea. Without a key, the client sorts it itself. */
 export async function POST(req: Request) {
-  const { error } = await aiRequest(req, "capture", 20);
+  const { error, spend } = await aiRequest(req, "capture", 20);
   if (error) return error;
 
   const { text, today } = ((await req.json().catch(() => null)) ?? {}) as { text?: unknown; today?: unknown };
   if (typeof text !== "string" || !text.trim() || text.length > MAX_TEXT) return Response.json({ error: "invalid_request" }, { status: 400 });
+  const limited = await spend();
+  if (limited) return limited;
   const day = Number.isInteger(today) && (today as number) >= 0 && (today as number) <= 6 ? (today as number) : 0;
 
   try {

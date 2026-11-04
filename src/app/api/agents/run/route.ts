@@ -20,7 +20,7 @@ const SCHEMA = {
 
 /** Does an agent's task with the model and returns the work for the user to approve. */
 export async function POST(req: Request) {
-  const { error } = await aiRequest(req, "agent", 6);
+  const { error, spend } = await aiRequest(req, "agent", 6);
   if (error) return error;
 
   const { agent, task, context } = ((await req.json().catch(() => null)) ?? {}) as { agent?: unknown; task?: unknown; context?: unknown };
@@ -28,6 +28,8 @@ export async function POST(req: Request) {
   if (!def || typeof task !== "string" || !task.trim() || task.length > MAX_TASK) return Response.json({ error: "invalid_request" }, { status: 400 });
   const data = JSON.stringify(context ?? {});
   if (data.length > MAX_CONTEXT_CHARS) return Response.json({ error: "invalid_request" }, { status: 400 });
+  const limited = await spend();
+  if (limited) return limited;
 
   try {
     const result = await askJson<AgentResult>(

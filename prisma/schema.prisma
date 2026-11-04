@@ -28,6 +28,7 @@ model User {
   billing       Billing?
   aiUsage       AiUsage[]
   spaces        SpaceMember[]
+  invitesSent   InviteCount[]
   spacesOwned   Space[]
 
   @@map("user")
@@ -267,4 +268,16 @@ model SpaceItem {
 
   @@index([spaceId])
   @@map("space_item")
+}
+
+/// New invitations per person per day. Kept apart from spaces, so deleting a space doesn't reset it.
+model InviteCount {
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// The UTC date, as YYYY-MM-DD.
+  day    String
+  count  Int    @default(0)
+
+  @@id([userId, day])
+  @@map("invite_count")
 }

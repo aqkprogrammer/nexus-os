@@ -279,10 +279,10 @@ export function savedState(s: Store) {
 export const useStore = create<Store>()(
   persist(
     (set, get) => {
-      /** Swaps the content but keeps who the user is and whether they've seen the tour. */
+      /** Swaps the content but keeps who the user is, their time zone and whether they've seen the tour. */
       const replaceWorkspace = (next: ReturnType<typeof seed>) => {
-        const { account, tourDone } = get();
-        set({ ...next, tourDone, selectedGoal: next.goals[0]?.id ?? "" });
+        const { account, tourDone, timezone } = get();
+        set({ ...next, tourDone, timezone, selectedGoal: next.goals[0]?.id ?? "" });
         if (account) get().setProfile({ name: account.name });
       };
 

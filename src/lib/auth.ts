@@ -20,6 +20,11 @@ async function hasPendingInvite(email: string) {
   return !!(await prisma.spaceInvite.findFirst({ where: { email: email.toLowerCase(), acceptedAt: null, expiresAt: { gt: new Date() } }, select: { id: true } }));
 }
 
+function ipHeaders() {
+  if (process.env.AUTH_IP_HEADER) return process.env.AUTH_IP_HEADER.split(",").map((h) => h.trim().toLowerCase());
+  return process.env.VERCEL ? ["x-vercel-forwarded-for"] : ["x-forwarded-for"];
+}
+
 export const auth = betterAuth({
   database: prismaAdapter(prisma, { provider: "postgresql" }),
   emailAndPassword: {
@@ -60,6 +65,9 @@ export const auth = betterAuth({
   account: { accountLinking: { enabled: true, trustedProviders: ["google"], allowDifferentEmails: true } },
   // Stored in the database so the limits hold across server instances.
   rateLimit: { enabled: true, storage: "database" },
+  // The sign-in limit is per visitor, so it must use an address the visitor can't fake. Vercel sets its own header,
+  // and behind another proxy AUTH_IP_HEADER names the one that proxy sets.
+  advanced: { ipAddress: { ipAddressHeaders: ipHeaders() } },
   databaseHooks: {
     user: {
       create: {

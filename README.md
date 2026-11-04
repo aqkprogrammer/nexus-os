@@ -96,7 +96,7 @@ Every push to `main` runs the same tests, and a failure stops the deploy.
 
 ## Accounts and data
 
-Sign-in uses email and password through [Better Auth](https://www.better-auth.com). Passwords are hashed, and repeated attempts are rate limited.
+Sign-in uses email and password through [Better Auth](https://www.better-auth.com). Passwords are hashed, and repeated attempts are rate limited by visitor address. Behind a proxy other than Vercel's, set `AUTH_IP_HEADER` to the header it sets, so the limit can't be dodged with a fake address.
 
 - **Sign-up is invite-only.** Only emails in `ALLOWED_EMAILS` can create an account, so a public deployment can't be used to spend your OpenAI credit.
 - **Each account has its own workspace.** It is saved to Postgres shortly after every change, and nothing personal stays in the browser.
@@ -142,7 +142,7 @@ Without a key, each of these says so and falls back: demo chat replies, agent pr
 
 ## Shared spaces
 
-Create a space for family or a team, then invite people by email as editors or viewers. Everyone sees the same shared goals and calendar. Editors can change them, viewers can only look, and only the owner manages members. An invitation also lets that email create an account, even when it isn't in `ALLOWED_EMAILS`.
+Create a space for family or a team, then invite people by email as editors or viewers. Everyone sees the same shared goals and calendar. Editors can change them, viewers can only look, and only the owner manages members. An invitation also lets that email create an account, even when it isn't in `ALLOWED_EMAILS`, so each person can send 20 new invitations a day, and the same address is emailed at most once every 10 minutes.
 
 ## Deployment
 

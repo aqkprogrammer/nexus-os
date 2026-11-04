@@ -8,7 +8,8 @@ import { sameOrigin } from "@/lib/request";
 const MAX_BODY_CHARS = 1_000_000;
 const MAX_ACTIVITY = 500;
 const HISTORY_DAYS = 120;
-const HISTORY_WEEKS = 20;
+/** The longest range is 13 weeks, compared with the 13 before it. */
+const HISTORY_WEEKS = 26;
 
 interface SaveRequest {
   state: Prisma.InputJsonObject;

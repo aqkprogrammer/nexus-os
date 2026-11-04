@@ -23,7 +23,7 @@ async function embed(texts: string[]) {
 }
 
 /** Embeds new or edited memories and forgets deleted ones. Unchanged memories cost nothing. */
-async function syncVectors(userId: string) {
+export async function syncVectors(userId: string) {
   const workspace = await prisma.workspace.findUnique({ where: { userId }, select: { state: true } });
   const raw = (workspace?.state as { memories?: MemoryLike[] } | null)?.memories;
   const memories = (Array.isArray(raw) ? raw : [])
@@ -53,9 +53,9 @@ async function syncVectors(userId: string) {
   }
 }
 
-/** The user's memories closest in meaning to `query`, best first. */
-export async function searchMemories(userId: string, query: string, limit = 10) {
-  await syncVectors(userId);
+/** The user's memories closest in meaning to `query`, best first. Without `sync`, it searches what's already embedded. */
+export async function searchMemories(userId: string, query: string, limit = 10, sync = true) {
+  if (sync) await syncVectors(userId);
   const [q] = await embed([query]);
   const rows = await prisma.$queryRaw<{ memoryId: string; text: string; score: number }[]>`
     SELECT "memoryId", "text", 1 - ("embedding" <=> ${vector(q)}::vector) AS score

@@ -51,9 +51,9 @@ export async function loadWorkspace() {
 
 let inFlight: Promise<void> = Promise.resolve();
 
-/** Saves now. If a save is already under way, waits for that one instead. */
-export function saveWorkspace(keepalive = false) {
-  if (saving) return inFlight;
+/** Saves now. If a save is already under way, waits for it, then saves anything that changed since it started. */
+export function saveWorkspace(keepalive = false): Promise<void> {
+  if (saving) return inFlight.then(() => saveWorkspace(keepalive));
   inFlight = save(keepalive);
   return inFlight;
 }

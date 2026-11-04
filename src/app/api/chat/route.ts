@@ -1,9 +1,10 @@
+import { after } from "next/server";
 import OpenAI from "openai";
 import type { ResponseInputItem } from "openai/resources/responses/responses";
 import { currentUser } from "@/lib/auth";
 import { CHAT_TOOLS, parseToolCall, type ChatEvent } from "@/lib/chat-tools";
 import { AI_LIMIT_REACHED, spendAi } from "@/lib/billing";
-import { searchMemories } from "@/lib/memory-search";
+import { searchMemories, syncVectors } from "@/lib/memory-search";
 import { rateLimited } from "@/lib/rate-limit";
 import { sameOrigin } from "@/lib/request";
 
@@ -71,14 +72,16 @@ export async function POST(req: Request) {
 
   if (!process.env.OPENAI_API_KEY) return Response.json({ error: "not_configured" }, { status: 503 });
   if (rateLimited(`chat:${user.id}`, RATE_LIMIT)) return Response.json({ error: "rate_limited" }, { status: 429 });
-  if (!(await spendAi(user.id))) return Response.json({ error: AI_LIMIT_REACHED }, { status: 402 });
 
   const body = parseBody(await req.json().catch(() => null));
   if (!body) return Response.json({ error: "invalid_request" }, { status: 400 });
+  if (!(await spendAi(user.id))) return Response.json({ error: AI_LIMIT_REACHED }, { status: 402 });
 
   // The client sends recent memories. Search adds older ones that match the question, when it's available.
   const question = body.messages[body.messages.length - 1].text;
-  const related = await searchMemories(user.id, question, 6).catch(() => []);
+  // Embedding new memories can take a while, so the reply uses what's ready and the rest catches up afterwards.
+  const related = await searchMemories(user.id, question, 6, false).catch(() => []);
+  after(() => syncVectors(user.id).catch((e) => console.error("Memory sync failed:", e)));
   if (related.length) Object.assign(body.context, { relatedMemories: related.map((r) => r.text) });
 
   const client = new OpenAI();

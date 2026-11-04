@@ -85,6 +85,31 @@ test("an invitation only works for the email it was sent to", async ({ browser, 
   await other.context.close();
 });
 
+test("two people ticking different milestones at once both count", async ({ context, page }) => {
+  await ownerWithSpace(page, context);
+  const spaceId = (await (await context.request.get("/api/spaces")).json()).spaces[0].id;
+  const headers = { origin: ORIGIN };
+  const milestones = Array.from({ length: 6 }, (_, i) => ({ id: `m${i}`, title: `Step ${i}`, done: false }));
+  const { item } = await (await context.request.post(`/api/spaces/${spaceId}/items`, { headers, data: { kind: "goal", data: { title: "Trip", milestones } } })).json();
+
+  await Promise.all(milestones.map((m) => context.request.patch(`/api/spaces/${spaceId}/items/${item.id}`, { headers, data: { milestone: m.id, done: true } })));
+
+  const { items } = await (await context.request.get(`/api/spaces/${spaceId}/items`)).json();
+  expect(items[0].data.milestones.every((m: { done: boolean }) => m.done)).toBe(true);
+});
+
+test("each person can only send so many new invitations a day", async ({ context, page }) => {
+  await ownerWithSpace(page, context);
+  const spaceId = (await (await context.request.get("/api/spaces")).json()).spaces[0].id;
+  const send = (email: string) => context.request.post(`/api/spaces/${spaceId}/members`, { headers: { origin: ORIGIN }, data: { email, role: "viewer" } });
+
+  const first = `${randomUUID()}@family.test`;
+  for (let i = 0; i < 20; i++) expect((await send(i === 0 ? first : `${randomUUID()}@family.test`)).status()).toBe(200);
+  expect((await send(`${randomUUID()}@family.test`)).status()).toBe(429);
+  // Inviting someone again renews their invitation and isn't a new one.
+  expect((await send(first)).status()).toBe(200);
+});
+
 test("people outside a space can't see it", async ({ browser, context, page }) => {
   await ownerWithSpace(page, context);
   const spaceId = (await (await context.request.get("/api/spaces")).json()).spaces[0].id;
